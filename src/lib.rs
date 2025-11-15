@@ -9,6 +9,7 @@ use std::io;
 use std::str::FromStr;
 use thiserror::Error;
 
+pub mod filter;
 pub mod parse;
 
 pub use filter::{NormalizeExt, normalize_times};

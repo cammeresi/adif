@@ -1,10 +1,12 @@
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
-use super::RecordStreamExt;
+use crate::parse::{RecordStream, TagDecoder, TagStream};
+use crate::{Data, Error, Field, Tag};
+
 use super::*;
 
 fn tags(s: &str) -> TagStream<&[u8]> {

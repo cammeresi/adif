@@ -295,3 +295,39 @@ async fn test_coerce_invalid_time() {
     let rec = next_record(&mut f, false).await;
     assert!(rec.get("time_on").unwrap().as_time().is_none());
 }
+
+#[tokio::test]
+async fn test_boolean_y() {
+    let mut f = RecordStream::new("<qsl:1:b>Y<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), true);
+    let mut f = RecordStream::new("<qsl:1:b>y<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), true);
+    let mut f = RecordStream::new("<qsl:1>Y<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), true);
+}
+
+#[tokio::test]
+async fn test_boolean_n() {
+    let mut f = RecordStream::new("<qsl:1>N<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), false);
+    let mut f = RecordStream::new("<qsl:1:b>N<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), false);
+    let mut f = RecordStream::new("<qsl:1:b>n<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), false);
+}
+
+#[tokio::test]
+async fn test_boolean_invalid() {
+    let mut f = RecordStream::new("<qsl:1:b>X<eor>".as_bytes(), true);
+    let err = f.next().await.unwrap().unwrap_err();
+    match err {
+        Error::InvalidFormat(_) => {}
+        _ => panic!("expected InvalidFormat error"),
+    }
+}

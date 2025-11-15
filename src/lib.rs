@@ -44,36 +44,55 @@ pub enum Data {
     Number(Decimal),
     Date(NaiveDate),
     Time(NaiveTime),
+    DateTime(NaiveDateTime),
     String(String),
 }
 
 impl Data {
     pub fn as_bool(&self) -> Option<bool> {
-        let Self::Boolean(b) = self else {
-            return None;
-        };
-        Some(*b)
+        match self {
+            Self::Boolean(b) => Some(*b),
+            Self::String(s) => match s.to_uppercase().as_str() {
+                "Y" => Some(true),
+                "N" => Some(false),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     pub fn as_number(&self) -> Option<Decimal> {
-        let Self::Number(n) = self else {
-            return None;
-        };
-        Some(*n)
+        match self {
+            Self::Number(n) => Some(*n),
+            Self::String(s) => Decimal::from_str(s).ok(),
+            _ => None,
+        }
     }
 
     pub fn as_date(&self) -> Option<NaiveDate> {
-        let Self::Date(d) = self else {
-            return None;
-        };
-        Some(*d)
+        match self {
+            Self::Date(d) => Some(*d),
+            Self::String(s) => NaiveDate::parse_from_str(s, "%Y%m%d").ok(),
+            _ => None,
+        }
     }
 
     pub fn as_time(&self) -> Option<NaiveTime> {
-        let Self::Time(t) = self else {
-            return None;
-        };
-        Some(*t)
+        match self {
+            Self::Time(t) => Some(*t),
+            Self::String(s) => NaiveTime::parse_from_str(s, "%H%M%S").ok(),
+            _ => None,
+        }
+    }
+
+    pub fn as_datetime(&self) -> Option<NaiveDateTime> {
+        match self {
+            Self::DateTime(dt) => Some(*dt),
+            Self::String(s) => {
+                NaiveDateTime::parse_from_str(s, "%Y%m%d %H%M%S").ok()
+            }
+            _ => None,
+        }
     }
 
     pub fn as_str(&self) -> Option<&str> {

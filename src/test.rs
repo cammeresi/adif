@@ -248,3 +248,48 @@ async fn too_many() {
         _ => panic!("expected InvalidFormat error"),
     }
 }
+
+#[tokio::test]
+async fn test_coerce_number_from_string() {
+    let mut f = RecordStream::new("<freq:6>14.070<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    let num = rec.get("freq").unwrap().as_number().unwrap();
+    assert_eq!(num, Decimal::from_str("14.070").unwrap());
+}
+
+#[tokio::test]
+async fn test_coerce_date_from_string() {
+    let mut f = RecordStream::new("<qso_date:8>20231215<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    let date = rec.get("qso_date").unwrap().as_date().unwrap();
+    assert_eq!(date, NaiveDate::from_ymd_opt(2023, 12, 15).unwrap());
+}
+
+#[tokio::test]
+async fn test_coerce_time_from_string() {
+    let mut f = RecordStream::new("<time_on:6>143000<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    let time = rec.get("time_on").unwrap().as_time().unwrap();
+    assert_eq!(time, NaiveTime::from_hms_opt(14, 30, 0).unwrap());
+}
+
+#[tokio::test]
+async fn test_coerce_invalid_number() {
+    let mut f = RecordStream::new("<freq:7>invalid<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert!(rec.get("freq").unwrap().as_number().is_none());
+}
+
+#[tokio::test]
+async fn test_coerce_invalid_date() {
+    let mut f = RecordStream::new("<qso_date:7>invalid<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert!(rec.get("qso_date").unwrap().as_date().is_none());
+}
+
+#[tokio::test]
+async fn test_coerce_invalid_time() {
+    let mut f = RecordStream::new("<time_on:7>invalid<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert!(rec.get("time_on").unwrap().as_time().is_none());
+}

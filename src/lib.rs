@@ -53,15 +53,18 @@ use thiserror::Error;
 pub mod filter;
 pub mod parse;
 
-pub use filter::{
-    NormalizeExt, normalize_band, normalize_mode, normalize_times,
-};
+pub use filter::NormalizeExt;
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
 
+/// Errors that can occur during ADIF parsing and processing.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// I/O error occurred while reading ADIF data.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
+    /// Invalid ADIF format encountered during parsing.
+    ///
+    /// This includes malformed tags, invalid type specifiers, or duplicate keys in records.
     #[error("Invalid ADIF format: {0}")]
     InvalidFormat(String),
 }
@@ -76,14 +79,24 @@ impl PartialEq for Error {
     }
 }
 
-/// Value for a field
+/// Value for a field in an ADIF record.
+///
+/// ADIF fields can have various types specified in their tags, or default to strings.
+/// This enum represents all possible typed values, and provides methods to coerce
+/// between types when needed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Datum {
+    /// Boolean value (type indicator `b` in ADIF tags).
     Boolean(bool),
+    /// Numeric value (type indicator `n` in ADIF tags).
     Number(Decimal),
+    /// Date value (type indicator `d` in ADIF tags), format YYYYMMDD.
     Date(NaiveDate),
+    /// Time value (type indicator `t` in ADIF tags), format HHMMSS.
     Time(NaiveTime),
+    /// Combined date and time value.
     DateTime(NaiveDateTime),
+    /// String value (default when no type indicator is present).
     String(String),
 }
 
@@ -207,11 +220,41 @@ pub struct Record {
 
 impl Record {
     /// True if this record represents an ADIF header.
+    ///
+    /// ```
+    /// # tokio_test::block_on(async {
+    /// use adif::RecordStream;
+    /// use futures::StreamExt;
+    /// let mut s = RecordStream::new(
+    ///     "<adifver:5>3.1.4<eoh><call:4>W1AW<eor>".as_bytes(),
+    ///     true,
+    /// );
+    /// let header = s.next().await.unwrap().unwrap();
+    /// assert!(header.is_header());
+    /// let record = s.next().await.unwrap().unwrap();
+    /// assert!(!record.is_header());
+    /// # });
+    /// ```
     pub fn is_header(&self) -> bool {
         self.header
     }
 
     /// Return the value of the requested field.
+    ///
+    /// ```
+    /// # tokio_test::block_on(async {
+    /// use adif::RecordStream;
+    /// use futures::StreamExt;
+    /// let mut s = RecordStream::new(
+    ///     "<call:4>W1AW<freq:6>14.074<eor>".as_bytes(),
+    ///     true,
+    /// );
+    /// let record = s.next().await.unwrap().unwrap();
+    /// assert_eq!(record.get("call").unwrap().as_str().unwrap(), "W1AW");
+    /// assert_eq!(record.get("freq").unwrap().as_str().unwrap(), "14.074");
+    /// assert!(record.get("missing").is_none());
+    /// # });
+    /// ```
     pub fn get<Q>(&self, name: &Q) -> Option<&Datum>
     where
         String: Borrow<Q>,
@@ -225,6 +268,26 @@ impl Record {
     /// Overwriting a previous value is not permitted and will return an
     /// error.  Transformations can only add new keys, not delete or replace
     /// them.
+    ///
+    /// ```
+    /// # tokio_test::block_on(async {
+    /// use adif::{Datum, RecordStream};
+    /// use futures::StreamExt;
+    /// let mut s = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
+    /// let mut record = s.next().await.unwrap().unwrap();
+    /// record.insert(
+    ///     "band".to_string(),
+    ///     Datum::String("20M".to_string()),
+    /// )
+    /// .unwrap();
+    /// assert_eq!(record.get("band").unwrap().as_str().unwrap(), "20M");
+    /// let err = record.insert(
+    ///     "call".to_string(),
+    ///     Datum::String("AB9BH".to_string()),
+    /// );
+    /// assert!(err.is_err());
+    /// # });
+    /// ```
     pub fn insert(&mut self, name: String, value: Datum) -> Result<(), Error> {
         if self.fields.contains_key(&name) {
             return Err(Error::InvalidFormat(format!(

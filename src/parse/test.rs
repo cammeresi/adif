@@ -108,7 +108,7 @@ async fn partial_tag_ignore() {
 async fn partial_tag_error() {
     let s = "<foo:3>ba";
     for i in 0..s.len() {
-        let mut f = TagDecoder::new_stream(s[..=i].as_bytes(), false);
+        let mut f = TagDecoder::new_stream(&s.as_bytes()[..=i], false);
         let err = f.next().await.unwrap().unwrap_err();
         match err {
             Error::InvalidFormat(_) => {}
@@ -298,26 +298,26 @@ async fn coerce_invalid_time() {
 async fn boolean_y() {
     let mut f = RecordStream::new("<qsl:1:b>Y<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), true);
+    assert!(rec.get("qsl").unwrap().as_bool().unwrap());
     let mut f = RecordStream::new("<qsl:1:b>y<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), true);
+    assert!(rec.get("qsl").unwrap().as_bool().unwrap());
     let mut f = RecordStream::new("<qsl:1>Y<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), true);
+    assert!(rec.get("qsl").unwrap().as_bool().unwrap());
 }
 
 #[tokio::test]
 async fn boolean_n() {
     let mut f = RecordStream::new("<qsl:1>N<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), false);
+    assert!(!rec.get("qsl").unwrap().as_bool().unwrap());
     let mut f = RecordStream::new("<qsl:1:b>N<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), false);
+    assert!(!rec.get("qsl").unwrap().as_bool().unwrap());
     let mut f = RecordStream::new("<qsl:1:b>n<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), false);
+    assert!(!rec.get("qsl").unwrap().as_bool().unwrap());
 }
 
 #[tokio::test]

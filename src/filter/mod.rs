@@ -188,3 +188,10 @@ where
         !exclude.contains(&call.to_uppercase())
     })
 }
+
+pub fn exclude_header<S>(stream: S) -> Filter<S, impl FnMut(&Record) -> bool>
+where
+    S: Stream<Item = Result<Record, Error>>,
+{
+    stream.filter(|record| !record.is_header())
+}

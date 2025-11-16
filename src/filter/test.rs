@@ -277,10 +277,10 @@ async fn exclude_callsigns_no_match() {
         true,
     );
     let mut filtered = exclude_callsigns(stream, &["W6RQ"]);
-    let r1 = next(&mut filtered).await;
-    assert_eq!(r1.get("call").unwrap().as_str().unwrap(), "W1AW");
-    let r2 = next(&mut filtered).await;
-    assert_eq!(r2.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    let rec = next(&mut filtered).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    let rec = next(&mut filtered).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
     assert!(filtered.next().await.is_none());
 }
 
@@ -291,7 +291,35 @@ async fn exclude_callsigns_missing_call() {
         true,
     );
     let mut filtered = exclude_callsigns(stream, &["W1AW"]);
-    let r1 = next(&mut filtered).await;
-    assert!(r1.get("call").is_none());
+    let rec = next(&mut filtered).await;
+    assert!(rec.get("call").is_none());
+    assert!(filtered.next().await.is_none());
+}
+
+#[tokio::test]
+async fn exclude_header_removes_header() {
+    let stream = RecordStream::new(
+        "<adifver:5>3.1.4<eoh><call:4>W1AW<eor><call:5>AB9BH<eor>".as_bytes(),
+        true,
+    );
+    let mut filtered = exclude_header(stream);
+    let rec = next(&mut filtered).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    let rec = next(&mut filtered).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert!(filtered.next().await.is_none());
+}
+
+#[tokio::test]
+async fn exclude_header_no_header() {
+    let stream = RecordStream::new(
+        "<call:4>W1AW<eor><call:5>AB9BH<eor>".as_bytes(),
+        true,
+    );
+    let mut filtered = exclude_header(stream);
+    let rec = next(&mut filtered).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    let rec = next(&mut filtered).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
     assert!(filtered.next().await.is_none());
 }

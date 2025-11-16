@@ -146,6 +146,33 @@ async fn normalize_mode_case_insensitive() {
 }
 
 #[tokio::test]
+async fn normalize_band_uppercase() {
+    let stream = RecordStream::new("<band:3>20m<eor>".as_bytes(), true);
+    let mut normalized = normalize_band(stream);
+    let record = normalized.next().await.unwrap().unwrap();
+
+    assert_eq!(record.get(":band").unwrap().as_str().unwrap(), "20M");
+}
+
+#[tokio::test]
+async fn normalize_band_already_upper() {
+    let stream = RecordStream::new("<band:3>40M<eor>".as_bytes(), true);
+    let mut normalized = normalize_band(stream);
+    let record = normalized.next().await.unwrap().unwrap();
+
+    assert_eq!(record.get(":band").unwrap().as_str().unwrap(), "40M");
+}
+
+#[tokio::test]
+async fn normalize_band_no_band() {
+    let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
+    let mut normalized = normalize_band(stream);
+    let record = normalized.next().await.unwrap().unwrap();
+
+    assert!(record.get(":band").is_none());
+}
+
+#[tokio::test]
 async fn normalize_times_typed() {
     let record =
         parse_normalized("<qso_date:8:d>20231215<time_on:6:t>143000<eor>")

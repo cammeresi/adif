@@ -111,3 +111,19 @@ where
             record.insert(":mode".to_string(), Data::String(mode.to_string()));
     })
 }
+
+pub fn normalize_band<S>(
+    stream: S,
+) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
+where
+    S: Stream<Item = Result<Record, Error>>,
+{
+    stream.normalize(|record| {
+        let Some(band) = record.get("band").and_then(|b| b.as_str()) else {
+            return;
+        };
+
+        let _ = record
+            .insert(":band".to_string(), Data::String(band.to_uppercase()));
+    })
+}

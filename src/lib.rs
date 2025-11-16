@@ -12,7 +12,9 @@ use thiserror::Error;
 pub mod filter;
 pub mod parse;
 
-pub use filter::{NormalizeExt, normalize_mode, normalize_times};
+pub use filter::{
+    NormalizeExt, normalize_band, normalize_mode, normalize_times,
+};
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
 
 #[derive(Debug, Error)]

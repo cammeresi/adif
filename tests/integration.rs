@@ -18,7 +18,7 @@ async fn parse_normalized(adif_data: &str) -> Record {
 }
 
 #[tokio::test]
-async fn test_normalize_times_typed() {
+async fn normalize_times_typed() {
     let record =
         parse_normalized("<qso_date:8:d>20231215<time_on:6:t>143000<eor>")
             .await;
@@ -29,7 +29,7 @@ async fn test_normalize_times_typed() {
 }
 
 #[tokio::test]
-async fn test_normalize_times_basic() {
+async fn normalize_times_basic() {
     let record =
         parse_normalized("<qso_date:8>20231215<time_on:6>143000<eor>").await;
 
@@ -39,7 +39,7 @@ async fn test_normalize_times_basic() {
 }
 
 #[tokio::test]
-async fn test_normalize_times_with_time_off_same_day() {
+async fn normalize_times_with_time_off_same_day() {
     let record = parse_normalized(
         "<qso_date:8>20231215<time_on:6>143000<time_off:6>153000<eor>",
     )
@@ -52,7 +52,7 @@ async fn test_normalize_times_with_time_off_same_day() {
 }
 
 #[tokio::test]
-async fn test_normalize_times_with_time_off_next_day() {
+async fn normalize_times_with_time_off_next_day() {
     let record = parse_normalized(
         "<qso_date:8>20231215<time_on:6>233000<time_off:6>001500<eor>",
     )
@@ -65,7 +65,7 @@ async fn test_normalize_times_with_time_off_next_day() {
 }
 
 #[tokio::test]
-async fn test_normalize_times_with_qso_date_off() {
+async fn normalize_times_with_qso_date_off() {
     let record = parse_normalized(
         "<qso_date:8>20231215<time_on:6>233000<qso_date_off:8>20231216<time_off:6>013000<eor>",
     )
@@ -78,7 +78,7 @@ async fn test_normalize_times_with_qso_date_off() {
 }
 
 #[tokio::test]
-async fn test_normalize_times_with_qso_date_off_midnight_cross() {
+async fn normalize_times_with_qso_date_off_midnight_cross() {
     let record = parse_normalized(
         "<qso_date:8>20231231<time_on:6>233000<qso_date_off:8>20240101<time_off:6>003000<eor>",
     )
@@ -91,7 +91,7 @@ async fn test_normalize_times_with_qso_date_off_midnight_cross() {
 }
 
 #[tokio::test]
-async fn test_normalize_times_missing_date() {
+async fn normalize_times_missing_date() {
     let record = parse_normalized("<time_on:6>143000<eor>").await;
 
     assert_eq!(
@@ -101,7 +101,7 @@ async fn test_normalize_times_missing_date() {
 }
 
 #[tokio::test]
-async fn test_normalize_times_missing_time_on() {
+async fn normalize_times_missing_time_on() {
     let record = parse_normalized("<qso_date:8>20231215<eor>").await;
 
     assert_eq!(

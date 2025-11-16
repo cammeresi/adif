@@ -15,8 +15,10 @@ use tokio_util::codec::{Decoder, FramedRead};
 #[cfg(test)]
 mod test;
 
+/// Stream of ADIF tags from an async reader.
 pub type TagStream<R> = FramedRead<R, TagDecoder>;
 
+/// Decoder for parsing individual ADIF tags from a byte stream.
 #[derive(Debug, Default)]
 pub struct TagDecoder {
     ignore_partial: bool,
@@ -155,7 +157,9 @@ impl Decoder for TagDecoder {
     }
 }
 
+/// Extension trait providing the `records` method on tag streams.
 pub trait RecordStreamExt: Stream {
+    /// Aggregate tags into records.
     fn records(self) -> RecordStream<Self>
     where
         Self: Sized,
@@ -169,6 +173,7 @@ pub trait RecordStreamExt: Stream {
 
 impl<S> RecordStreamExt for S where S: Stream {}
 
+/// Stream that aggregates ADIF tags into complete records.
 pub struct RecordStream<S> {
     stream: S,
     fields: HashMap<String, Datum>,

@@ -1,4 +1,4 @@
-//#![warn(missing_docs)] // TODO
+#![warn(missing_docs)]
 
 //! Parsing of Amateur Data Interchange Format (ADIF) data using asynchronous
 //! streams.

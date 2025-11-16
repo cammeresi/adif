@@ -10,6 +10,7 @@ use std::task::{Context, Poll};
 #[cfg(test)]
 mod test;
 
+/// Stream adapter that applies an in-place transformation to each record.
 pub struct Normalize<S, F> {
     stream: S,
     f: F,
@@ -37,7 +38,9 @@ where
     }
 }
 
+/// Extension trait providing the `normalize` method on streams.
 pub trait NormalizeExt: Stream {
+    /// Apply an in-place transformation to each record in the stream.
     fn normalize<F>(self, f: F) -> Normalize<Self, F>
     where
         Self: Sized,
@@ -49,6 +52,7 @@ pub trait NormalizeExt: Stream {
 
 impl<S> NormalizeExt for S where S: Stream {}
 
+/// Stream adapter that yields or removes records based on a predicate.
 pub struct Filter<S, F> {
     stream: S,
     f: F,
@@ -79,7 +83,9 @@ where
     }
 }
 
+/// Extension trait providing the `filter` method on streams.
 pub trait FilterExt: Stream {
+    /// Filter records, yielding only those for which the predicate is true.
     fn filter<F>(self, f: F) -> Filter<Self, F>
     where
         Self: Sized,
@@ -91,6 +97,11 @@ pub trait FilterExt: Stream {
 
 impl<S> FilterExt for S where S: Stream {}
 
+/// Normalize date and time fields from multiple possible source fields into
+/// combined datetime values.
+///
+/// Create `:time_on` and `:time_off` fields from separate date/time
+/// components.  Handle date crossing when time_off is earlier than time_on.
 pub fn normalize_times<S>(
     stream: S,
 ) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
@@ -123,6 +134,10 @@ where
     })
 }
 
+/// Normalize mode field from multiple possible source fields.
+///
+/// Coalesce mode from `mode`, `app_lotw_mode`, or `app_lotw_modegroup`
+/// fields, and provide special handling for MFSK submodes (FT4, Q65).
 pub fn normalize_mode<S>(
     stream: S,
 ) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
@@ -156,6 +171,7 @@ where
     })
 }
 
+/// Normalize band field to uppercase.
 pub fn normalize_band<S>(
     stream: S,
 ) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
@@ -172,6 +188,9 @@ where
     })
 }
 
+/// Exclude records matching specified callsigns.
+///
+/// Case-insensitive comparison.  Records without a `call` field pass through.
 pub fn exclude_callsigns<S>(
     stream: S, callsigns: &[&str],
 ) -> Filter<S, impl FnMut(&Record) -> bool>
@@ -189,6 +208,7 @@ where
     })
 }
 
+/// Exclude header records from the stream.
 pub fn exclude_header<S>(stream: S) -> Filter<S, impl FnMut(&Record) -> bool>
 where
     S: Stream<Item = Result<Record, Error>>,

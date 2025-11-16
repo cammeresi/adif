@@ -78,7 +78,7 @@ impl PartialEq for Error {
 
 /// Value for a field
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Data {
+pub enum Datum {
     Boolean(bool),
     Number(Decimal),
     Date(NaiveDate),
@@ -87,7 +87,7 @@ pub enum Data {
     String(String),
 }
 
-impl Data {
+impl Datum {
     /// Return a [bool] value or coerce a string thereto.
     pub fn as_bool(&self) -> Option<bool> {
         match self {
@@ -152,7 +152,7 @@ impl Data {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Field {
     name: String,
-    value: Data,
+    value: Datum,
 }
 
 impl Field {
@@ -162,7 +162,7 @@ impl Field {
     }
 
     /// Return the value of the tag.
-    pub fn value(&self) -> &Data {
+    pub fn value(&self) -> &Datum {
         &self.value
     }
 }
@@ -202,7 +202,7 @@ impl Tag {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Record {
     header: bool,
-    fields: HashMap<String, Data>,
+    fields: HashMap<String, Datum>,
 }
 
 impl Record {
@@ -212,7 +212,7 @@ impl Record {
     }
 
     /// Return the value of the requested field.
-    pub fn get<Q>(&self, name: &Q) -> Option<&Data>
+    pub fn get<Q>(&self, name: &Q) -> Option<&Datum>
     where
         String: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
@@ -225,7 +225,7 @@ impl Record {
     /// Overwriting a previous value is not permitted and will return an
     /// error.  Transformations can only add new keys, not delete or replace
     /// them.
-    pub fn insert(&mut self, name: String, value: Data) -> Result<(), Error> {
+    pub fn insert(&mut self, name: String, value: Datum) -> Result<(), Error> {
         if self.fields.contains_key(&name) {
             return Err(Error::InvalidFormat(format!(
                 "duplicate key: {}",

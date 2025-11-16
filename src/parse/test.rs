@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
 use super::*;
-use crate::{Data, Error, Field, Tag};
+use crate::{Datum, Error, Field, Tag};
 
 fn tags(s: &str) -> TagStream<&[u8]> {
     TagDecoder::new_stream(s.as_bytes(), true)
@@ -91,7 +91,7 @@ async fn uppercase() {
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "foo");
-    assert_eq!(field.value(), &Data::String("Bar".to_string()));
+    assert_eq!(field.value(), &Datum::String("Bar".to_string()));
     no_tags(&mut f).await;
 }
 

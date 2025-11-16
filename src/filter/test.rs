@@ -40,7 +40,7 @@ async fn duplicate_key_error() {
     let mut record = normalized.next().await.unwrap().unwrap();
 
     let err = record
-        .insert(":time_on".to_string(), Data::String("test".to_string()))
+        .insert(":time_on".to_string(), Datum::String("test".to_string()))
         .unwrap_err();
     match err {
         Error::InvalidFormat(s) => assert_eq!(s, "duplicate key: :time_on"),

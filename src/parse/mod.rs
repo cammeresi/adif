@@ -1,6 +1,6 @@
 //! Parsing of ADIF data at various levels of sophistication
 
-use crate::{Data, Error, Field, Record, Tag};
+use crate::{Datum, Error, Field, Record, Tag};
 use bytes::{Buf, BytesMut};
 use chrono::{NaiveDate, NaiveTime};
 use futures::stream::Stream;
@@ -47,7 +47,7 @@ impl TagDecoder {
 
     fn parse_value(
         tag: &[u8], end: usize, src: &BytesMut,
-    ) -> Result<Option<(String, Data, usize)>, Error> {
+    ) -> Result<Option<(String, Datum, usize)>, Error> {
         let parts: Vec<&[u8]> = tag.split(|&b| b == b':').collect();
         let (name, len, typ) = match parts[..] {
             [name, len] => (name, len, None),
@@ -72,7 +72,7 @@ impl TagDecoder {
             Some("n") => {
                 let num = Decimal::from_str(&s)
                     .map_err(|_| Self::invalid_tag(tag))?;
-                Data::Number(num)
+                Datum::Number(num)
             }
             Some("b") => {
                 let b = match s.to_uppercase().as_str() {
@@ -80,19 +80,19 @@ impl TagDecoder {
                     "N" => false,
                     _ => return Err(Self::invalid_tag(tag)),
                 };
-                Data::Boolean(b)
+                Datum::Boolean(b)
             }
             Some("d") => {
                 let date = NaiveDate::parse_from_str(&s, "%Y%m%d")
                     .map_err(|_| Self::invalid_tag(tag))?;
-                Data::Date(date)
+                Datum::Date(date)
             }
             Some("t") => {
                 let time = NaiveTime::parse_from_str(&s, "%H%M%S")
                     .map_err(|_| Self::invalid_tag(tag))?;
-                Data::Time(time)
+                Datum::Time(time)
             }
-            _ => Data::String(s.to_string()),
+            _ => Datum::String(s.to_string()),
         };
 
         Ok(Some((name, value, end)))
@@ -171,7 +171,7 @@ impl<S> RecordStreamExt for S where S: Stream {}
 
 pub struct RecordStream<S> {
     stream: S,
-    fields: HashMap<String, Data>,
+    fields: HashMap<String, Datum>,
 }
 
 impl<S> RecordStream<S> {

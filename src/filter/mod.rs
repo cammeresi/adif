@@ -1,6 +1,6 @@
 //! Optional ADIF data transformations
 
-use crate::{Data, Error, Record};
+use crate::{Datum, Error, Record};
 use chrono::{Days, NaiveDateTime};
 use futures::stream::Stream;
 use std::pin::Pin;
@@ -63,7 +63,7 @@ where
 
         if let (Some(date), Some(time_on)) = (date, time_on) {
             let dt = NaiveDateTime::new(date, time_on);
-            let _ = record.insert(":time_on".to_string(), Data::DateTime(dt));
+            let _ = record.insert(":time_on".to_string(), Datum::DateTime(dt));
 
             if let Some(time_off) = time_off {
                 let date = if let Some(date_off) = date_off {
@@ -75,7 +75,7 @@ where
                 };
                 let dt = NaiveDateTime::new(date, time_off);
                 let _ =
-                    record.insert(":time_off".to_string(), Data::DateTime(dt));
+                    record.insert(":time_off".to_string(), Datum::DateTime(dt));
             }
         }
     })
@@ -110,7 +110,7 @@ where
         };
 
         let _ =
-            record.insert(":mode".to_string(), Data::String(mode.to_string()));
+            record.insert(":mode".to_string(), Datum::String(mode.to_string()));
     })
 }
 
@@ -126,6 +126,6 @@ where
         };
 
         let _ = record
-            .insert(":band".to_string(), Data::String(band.to_uppercase()));
+            .insert(":band".to_string(), Datum::String(band.to_uppercase()));
     })
 }

@@ -12,11 +12,8 @@ use thiserror::Error;
 pub mod filter;
 pub mod parse;
 
-pub use filter::{NormalizeExt, normalize_times};
+pub use filter::{NormalizeExt, normalize_mode, normalize_times};
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
-
-#[cfg(test)]
-mod test;
 
 #[derive(Debug, Error)]
 pub enum Error {

@@ -4,10 +4,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
-use crate::parse::{RecordStream, TagDecoder, TagStream};
-use crate::{Data, Error, Field, Tag};
-
 use super::*;
+use crate::{Data, Error, Field, Tag};
 
 fn tags(s: &str) -> TagStream<&[u8]> {
     TagDecoder::new_stream(s.as_bytes(), true)
@@ -252,7 +250,7 @@ async fn too_many() {
 }
 
 #[tokio::test]
-async fn test_coerce_number_from_string() {
+async fn coerce_number_from_string() {
     let mut f = RecordStream::new("<freq:6>14.070<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     let num = rec.get("freq").unwrap().as_number().unwrap();
@@ -260,7 +258,7 @@ async fn test_coerce_number_from_string() {
 }
 
 #[tokio::test]
-async fn test_coerce_date_from_string() {
+async fn coerce_date_from_string() {
     let mut f = RecordStream::new("<qso_date:8>20231215<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     let date = rec.get("qso_date").unwrap().as_date().unwrap();
@@ -268,7 +266,7 @@ async fn test_coerce_date_from_string() {
 }
 
 #[tokio::test]
-async fn test_coerce_time_from_string() {
+async fn coerce_time_from_string() {
     let mut f = RecordStream::new("<time_on:6>143000<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     let time = rec.get("time_on").unwrap().as_time().unwrap();
@@ -276,28 +274,28 @@ async fn test_coerce_time_from_string() {
 }
 
 #[tokio::test]
-async fn test_coerce_invalid_number() {
+async fn coerce_invalid_number() {
     let mut f = RecordStream::new("<freq:7>invalid<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     assert!(rec.get("freq").unwrap().as_number().is_none());
 }
 
 #[tokio::test]
-async fn test_coerce_invalid_date() {
+async fn coerce_invalid_date() {
     let mut f = RecordStream::new("<qso_date:7>invalid<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     assert!(rec.get("qso_date").unwrap().as_date().is_none());
 }
 
 #[tokio::test]
-async fn test_coerce_invalid_time() {
+async fn coerce_invalid_time() {
     let mut f = RecordStream::new("<time_on:7>invalid<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     assert!(rec.get("time_on").unwrap().as_time().is_none());
 }
 
 #[tokio::test]
-async fn test_boolean_y() {
+async fn boolean_y() {
     let mut f = RecordStream::new("<qsl:1:b>Y<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), true);
@@ -310,7 +308,7 @@ async fn test_boolean_y() {
 }
 
 #[tokio::test]
-async fn test_boolean_n() {
+async fn boolean_n() {
     let mut f = RecordStream::new("<qsl:1>N<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     assert_eq!(rec.get("qsl").unwrap().as_bool().unwrap(), false);
@@ -323,7 +321,7 @@ async fn test_boolean_n() {
 }
 
 #[tokio::test]
-async fn test_boolean_invalid() {
+async fn boolean_invalid() {
     let mut f = RecordStream::new("<qsl:1:b>X<eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
     match err {

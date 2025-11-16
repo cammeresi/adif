@@ -10,6 +10,9 @@ use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 use tokio_util::codec::{Decoder, FramedRead};
 
+#[cfg(test)]
+mod test;
+
 pub type TagStream<R> = FramedRead<R, TagDecoder>;
 
 #[derive(Debug, Default)]

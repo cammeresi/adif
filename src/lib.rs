@@ -1,9 +1,7 @@
 #![warn(missing_docs)]
-
 #![deny(clippy::unimplemented)]
 #![deny(clippy::unreachable)]
 #![deny(clippy::todo)]
-
 #![cfg_attr(not(test), deny(clippy::panic))]
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]
 #![cfg_attr(not(test), deny(clippy::expect_used))]
@@ -57,7 +55,7 @@
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use rust_decimal::Decimal;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::io;
@@ -166,12 +164,23 @@ impl Datum {
         }
     }
 
-    /// Return the text of an untyped or string-typed field.
-    pub fn as_str(&self) -> Option<&str> {
-        let Self::String(s) = self else {
-            return None;
-        };
-        Some(s)
+    /// Coerce any datum to a string representation.
+    ///
+    /// String variants return borrowed data, all other types are returned in
+    /// ADIF format (boolean Y/N, date YYYYMMDD, time HHMMSS).
+    pub fn as_str(&self) -> Option<Cow<'_, str>> {
+        match self {
+            Self::String(s) => Some(Cow::Borrowed(s)),
+            Self::Boolean(b) => {
+                Some(Cow::Owned(if *b { "Y" } else { "N" }.to_string()))
+            }
+            Self::Number(n) => Some(Cow::Owned(n.to_string())),
+            Self::Date(d) => Some(Cow::Owned(d.format("%Y%m%d").to_string())),
+            Self::Time(t) => Some(Cow::Owned(t.format("%H%M%S").to_string())),
+            Self::DateTime(dt) => {
+                Some(Cow::Owned(dt.format("%Y%m%d %H%M%S").to_string()))
+            }
+        }
     }
 }
 

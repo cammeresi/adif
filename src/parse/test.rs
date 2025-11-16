@@ -1,6 +1,9 @@
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use futures::{Stream, StreamExt};
+use rust_decimal::Decimal;
 use std::io;
 use std::pin::Pin;
+use std::str::FromStr;
 use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
@@ -328,4 +331,47 @@ async fn boolean_invalid() {
         Error::InvalidFormat(_) => {}
         _ => panic!("expected InvalidFormat error"),
     }
+}
+
+#[tokio::test]
+async fn as_str_roundtrip() {
+    let b = true;
+    let datum = Datum::Boolean(b);
+    let s = datum.as_str().unwrap();
+    assert_eq!(s, "Y");
+    assert_eq!(Datum::String(s.to_string()).as_bool().unwrap(), b);
+
+    let b = false;
+    let datum = Datum::Boolean(b);
+    let s = datum.as_str().unwrap();
+    assert_eq!(s, "N");
+    assert_eq!(Datum::String(s.to_string()).as_bool().unwrap(), b);
+
+    let n = Decimal::from_str("14.070").unwrap();
+    let datum = Datum::Number(n);
+    let s = datum.as_str().unwrap();
+    assert_eq!(Datum::String(s.to_string()).as_number().unwrap(), n);
+
+    let d = NaiveDate::from_ymd_opt(2023, 12, 15).unwrap();
+    let datum = Datum::Date(d);
+    let s = datum.as_str().unwrap();
+    assert_eq!(s, "20231215");
+    assert_eq!(Datum::String(s.to_string()).as_date().unwrap(), d);
+
+    let t = NaiveTime::from_hms_opt(14, 30, 0).unwrap();
+    let datum = Datum::Time(t);
+    let s = datum.as_str().unwrap();
+    assert_eq!(s, "143000");
+    assert_eq!(Datum::String(s.to_string()).as_time().unwrap(), t);
+
+    let dt = NaiveDateTime::new(d, t);
+    let datum = Datum::DateTime(dt);
+    let s = datum.as_str().unwrap();
+    assert_eq!(s, "20231215 143000");
+    assert_eq!(Datum::String(s.to_string()).as_datetime().unwrap(), dt);
+
+    let str = "hello world";
+    let datum = Datum::String(str.to_string());
+    let s = datum.as_str().unwrap();
+    assert_eq!(s, str);
 }

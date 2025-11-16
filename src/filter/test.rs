@@ -12,9 +12,21 @@ fn dt(
         .unwrap()
 }
 
-async fn parse_normalized(adif_data: &str) -> Record {
+async fn parse_norm_times(adif_data: &str) -> Record {
     let stream = RecordStream::new(adif_data.as_bytes(), true);
     let mut normalized = normalize_times(stream);
+    normalized.next().await.unwrap().unwrap()
+}
+
+async fn parse_norm_mode(adif_data: &str) -> Record {
+    let stream = RecordStream::new(adif_data.as_bytes(), true);
+    let mut normalized = normalize_mode(stream);
+    normalized.next().await.unwrap().unwrap()
+}
+
+async fn parse_norm_band(adif_data: &str) -> Record {
+    let stream = RecordStream::new(adif_data.as_bytes(), true);
+    let mut normalized = normalize_band(stream);
     normalized.next().await.unwrap().unwrap()
 }
 
@@ -38,144 +50,92 @@ async fn duplicate_key_error() {
 
 #[tokio::test]
 async fn normalize_mode_from_mode() {
-    let stream = RecordStream::new("<mode:3>SSB<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<mode:3>SSB<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "SSB");
 }
 
 #[tokio::test]
 async fn normalize_mode_from_app_lotw_mode() {
-    let stream =
-        RecordStream::new("<app_lotw_mode:3>FT8<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<app_lotw_mode:3>FT8<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "FT8");
 }
 
 #[tokio::test]
 async fn normalize_mode_from_modegroup() {
-    let stream =
-        RecordStream::new("<app_lotw_modegroup:4>RTTY<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<app_lotw_modegroup:4>RTTY<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "RTTY");
 }
 
 #[tokio::test]
 async fn normalize_mode_precedence() {
-    let stream = RecordStream::new(
-        "<mode:3>SSB<app_lotw_mode:3>FT8<eor>".as_bytes(),
-        true,
-    );
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<mode:3>SSB<app_lotw_mode:3>FT8<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "SSB");
 }
 
 #[tokio::test]
 async fn normalize_mode_no_source() {
-    let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<call:4>W1AW<eor>").await;
     assert!(record.get(":mode").is_none());
 }
 
 #[tokio::test]
 async fn normalize_mode_mfsk_with_ft4() {
-    let stream =
-        RecordStream::new("<mode:4>MFSK<submode:3>FT4<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<mode:4>MFSK<submode:3>FT4<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "FT4");
 }
 
 #[tokio::test]
 async fn normalize_mode_mfsk_with_q65() {
-    let stream =
-        RecordStream::new("<mode:4>MFSK<submode:3>Q65<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<mode:4>MFSK<submode:3>Q65<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "Q65");
 }
 
 #[tokio::test]
 async fn normalize_mode_mfsk_with_other_submode() {
-    let stream =
-        RecordStream::new("<mode:4>MFSK<submode:3>XXX<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<mode:4>MFSK<submode:3>XXX<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "MFSK");
 }
 
 #[tokio::test]
 async fn normalize_mode_mfsk_no_submode() {
-    let stream = RecordStream::new("<mode:4>MFSK<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<mode:4>MFSK<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "MFSK");
 }
 
 #[tokio::test]
 async fn normalize_mode_non_mfsk_with_submode() {
-    let stream =
-        RecordStream::new("<mode:3>SSB<submode:3>FT4<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<mode:3>SSB<submode:3>FT4<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "SSB");
 }
 
 #[tokio::test]
 async fn normalize_mode_case_insensitive() {
-    let stream =
-        RecordStream::new("<mode:4>mfsk<submode:3>ft4<eor>".as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_mode("<mode:4>mfsk<submode:3>ft4<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "ft4");
 }
 
 #[tokio::test]
 async fn normalize_band_uppercase() {
-    let stream = RecordStream::new("<band:3>20m<eor>".as_bytes(), true);
-    let mut normalized = normalize_band(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_band("<band:3>20m<eor>").await;
     assert_eq!(record.get(":band").unwrap().as_str().unwrap(), "20M");
 }
 
 #[tokio::test]
 async fn normalize_band_already_upper() {
-    let stream = RecordStream::new("<band:3>40M<eor>".as_bytes(), true);
-    let mut normalized = normalize_band(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_band("<band:3>40M<eor>").await;
     assert_eq!(record.get(":band").unwrap().as_str().unwrap(), "40M");
 }
 
 #[tokio::test]
 async fn normalize_band_no_band() {
-    let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
-    let mut normalized = normalize_band(stream);
-    let record = normalized.next().await.unwrap().unwrap();
-
+    let record = parse_norm_band("<call:4>W1AW<eor>").await;
     assert!(record.get(":band").is_none());
 }
 
 #[tokio::test]
 async fn normalize_times_typed() {
     let record =
-        parse_normalized("<qso_date:8:d>20231215<time_on:6:t>143000<eor>")
+        parse_norm_times("<qso_date:8:d>20231215<time_on:6:t>143000<eor>")
             .await;
 
     let time_on = record.get(":time_on").unwrap().as_datetime().unwrap();
@@ -186,7 +146,7 @@ async fn normalize_times_typed() {
 #[tokio::test]
 async fn normalize_times_basic() {
     let record =
-        parse_normalized("<qso_date:8>20231215<time_on:6>143000<eor>").await;
+        parse_norm_times("<qso_date:8>20231215<time_on:6>143000<eor>").await;
 
     let time_on = record.get(":time_on").unwrap().as_datetime().unwrap();
     assert_eq!(time_on, dt(2023, 12, 15, 14, 30, 0));
@@ -195,7 +155,7 @@ async fn normalize_times_basic() {
 
 #[tokio::test]
 async fn normalize_times_with_time_off_same_day() {
-    let record = parse_normalized(
+    let record = parse_norm_times(
         "<qso_date:8>20231215<time_on:6>143000<time_off:6>153000<eor>",
     )
     .await;
@@ -208,7 +168,7 @@ async fn normalize_times_with_time_off_same_day() {
 
 #[tokio::test]
 async fn normalize_times_with_time_off_next_day() {
-    let record = parse_normalized(
+    let record = parse_norm_times(
         "<qso_date:8>20231215<time_on:6>233000<time_off:6>001500<eor>",
     )
     .await;
@@ -221,7 +181,7 @@ async fn normalize_times_with_time_off_next_day() {
 
 #[tokio::test]
 async fn normalize_times_with_qso_date_off() {
-    let record = parse_normalized(
+    let record = parse_norm_times(
         "<qso_date:8>20231215<time_on:6>233000<qso_date_off:8>20231216<time_off:6>013000<eor>",
     )
     .await;
@@ -234,7 +194,7 @@ async fn normalize_times_with_qso_date_off() {
 
 #[tokio::test]
 async fn normalize_times_with_qso_date_off_midnight_cross() {
-    let record = parse_normalized(
+    let record = parse_norm_times(
         "<qso_date:8>20231231<time_on:6>233000<qso_date_off:8>20240101<time_off:6>003000<eor>",
     )
     .await;
@@ -247,7 +207,7 @@ async fn normalize_times_with_qso_date_off_midnight_cross() {
 
 #[tokio::test]
 async fn normalize_times_missing_date() {
-    let record = parse_normalized("<time_on:6>143000<eor>").await;
+    let record = parse_norm_times("<time_on:6>143000<eor>").await;
 
     assert_eq!(
         record.get("time_on").unwrap().as_time().unwrap(),
@@ -257,7 +217,7 @@ async fn normalize_times_missing_date() {
 
 #[tokio::test]
 async fn normalize_times_missing_time_on() {
-    let record = parse_normalized("<qso_date:8>20231215<eor>").await;
+    let record = parse_norm_times("<qso_date:8>20231215<eor>").await;
 
     assert_eq!(
         record.get("qso_date").unwrap().as_date().unwrap(),

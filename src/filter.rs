@@ -76,6 +76,26 @@ where
     })
 }
 
+pub fn normalize_mode<S>(
+    stream: S,
+) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
+where
+    S: Stream<Item = Result<Record, Error>>,
+{
+    stream.normalize(|record| {
+        let mode = record
+            .get("mode")
+            .or_else(|| record.get("app_lotw_mode"))
+            .or_else(|| record.get("app_lotw_modegroup"))
+            .and_then(|m| m.as_str());
+
+        if let Some(m) = mode {
+            let _ =
+                record.insert(":mode".to_string(), Data::String(m.to_string()));
+        }
+    })
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -83,7 +103,7 @@ mod test {
     use futures::StreamExt;
 
     #[tokio::test]
-    async fn test_duplicate_key_error() {
+    async fn duplicate_key_error() {
         let stream = RecordStream::new(
             "<qso_date:8>20231215<time_on:6>143000<eor>".as_bytes(),
             true,
@@ -98,5 +118,57 @@ mod test {
             Error::InvalidFormat(s) => assert_eq!(s, "duplicate key: :time_on"),
             _ => panic!("expected InvalidFormat error"),
         }
+    }
+
+    #[tokio::test]
+    async fn normalize_mode_from_mode() {
+        let stream = RecordStream::new("<mode:3>SSB<eor>".as_bytes(), true);
+        let mut normalized = normalize_mode(stream);
+        let record = normalized.next().await.unwrap().unwrap();
+
+        assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "SSB");
+    }
+
+    #[tokio::test]
+    async fn normalize_mode_from_app_lotw_mode() {
+        let stream =
+            RecordStream::new("<app_lotw_mode:3>FT8<eor>".as_bytes(), true);
+        let mut normalized = normalize_mode(stream);
+        let record = normalized.next().await.unwrap().unwrap();
+
+        assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "FT8");
+    }
+
+    #[tokio::test]
+    async fn normalize_mode_from_modegroup() {
+        let stream = RecordStream::new(
+            "<app_lotw_modegroup:4>RTTY<eor>".as_bytes(),
+            true,
+        );
+        let mut normalized = normalize_mode(stream);
+        let record = normalized.next().await.unwrap().unwrap();
+
+        assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "RTTY");
+    }
+
+    #[tokio::test]
+    async fn normalize_mode_precedence() {
+        let stream = RecordStream::new(
+            "<mode:3>SSB<app_lotw_mode:3>FT8<eor>".as_bytes(),
+            true,
+        );
+        let mut normalized = normalize_mode(stream);
+        let record = normalized.next().await.unwrap().unwrap();
+
+        assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "SSB");
+    }
+
+    #[tokio::test]
+    async fn normalize_mode_no_source() {
+        let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
+        let mut normalized = normalize_mode(stream);
+        let record = normalized.next().await.unwrap().unwrap();
+
+        assert!(record.get(":mode").is_none());
     }
 }

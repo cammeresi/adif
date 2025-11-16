@@ -1,3 +1,5 @@
+//! Optional ADIF data transformations
+
 use crate::{Data, Error, Record};
 use chrono::{Days, NaiveDateTime};
 use futures::stream::Stream;

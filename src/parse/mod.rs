@@ -1,3 +1,5 @@
+//! Parsing of ADIF data at various levels of sophistication
+
 use crate::{Data, Error, Field, Record, Tag};
 use bytes::{Buf, BytesMut};
 use chrono::{NaiveDate, NaiveTime};

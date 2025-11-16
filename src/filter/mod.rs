@@ -85,6 +85,8 @@ pub fn normalize_mode<S>(
 where
     S: Stream<Item = Result<Record, Error>>,
 {
+    const MFSK_SUBMODES: &[&str] = &["FT4", "Q65"];
+
     stream.normalize(|record| {
         let mode = record
             .get("mode")
@@ -92,9 +94,20 @@ where
             .or_else(|| record.get("app_lotw_modegroup"))
             .and_then(|m| m.as_str());
 
-        if let Some(m) = mode {
-            let _ =
-                record.insert(":mode".to_string(), Data::String(m.to_string()));
-        }
+        let Some(mode) = mode else { return };
+        let sub = record.get("submode").and_then(|s| s.as_str());
+
+        let mode = match sub {
+            Some(sub)
+                if mode.eq_ignore_ascii_case("MFSK")
+                    && MFSK_SUBMODES.contains(&sub.to_uppercase().as_str()) =>
+            {
+                sub
+            }
+            _ => mode,
+        };
+
+        let _ =
+            record.insert(":mode".to_string(), Data::String(mode.to_string()));
     })
 }

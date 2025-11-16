@@ -87,6 +87,65 @@ async fn normalize_mode_no_source() {
 }
 
 #[tokio::test]
+async fn normalize_mode_mfsk_with_ft4() {
+    let stream =
+        RecordStream::new("<mode:4>MFSK<submode:3>FT4<eor>".as_bytes(), true);
+    let mut normalized = normalize_mode(stream);
+    let record = normalized.next().await.unwrap().unwrap();
+
+    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "FT4");
+}
+
+#[tokio::test]
+async fn normalize_mode_mfsk_with_q65() {
+    let stream =
+        RecordStream::new("<mode:4>MFSK<submode:3>Q65<eor>".as_bytes(), true);
+    let mut normalized = normalize_mode(stream);
+    let record = normalized.next().await.unwrap().unwrap();
+
+    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "Q65");
+}
+
+#[tokio::test]
+async fn normalize_mode_mfsk_with_other_submode() {
+    let stream =
+        RecordStream::new("<mode:4>MFSK<submode:3>XXX<eor>".as_bytes(), true);
+    let mut normalized = normalize_mode(stream);
+    let record = normalized.next().await.unwrap().unwrap();
+
+    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "MFSK");
+}
+
+#[tokio::test]
+async fn normalize_mode_mfsk_no_submode() {
+    let stream = RecordStream::new("<mode:4>MFSK<eor>".as_bytes(), true);
+    let mut normalized = normalize_mode(stream);
+    let record = normalized.next().await.unwrap().unwrap();
+
+    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "MFSK");
+}
+
+#[tokio::test]
+async fn normalize_mode_non_mfsk_with_submode() {
+    let stream =
+        RecordStream::new("<mode:3>SSB<submode:3>FT4<eor>".as_bytes(), true);
+    let mut normalized = normalize_mode(stream);
+    let record = normalized.next().await.unwrap().unwrap();
+
+    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "SSB");
+}
+
+#[tokio::test]
+async fn normalize_mode_case_insensitive() {
+    let stream =
+        RecordStream::new("<mode:4>mfsk<submode:3>ft4<eor>".as_bytes(), true);
+    let mut normalized = normalize_mode(stream);
+    let record = normalized.next().await.unwrap().unwrap();
+
+    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "ft4");
+}
+
+#[tokio::test]
 async fn normalize_times_typed() {
     let record =
         parse_normalized("<qso_date:8:d>20231215<time_on:6:t>143000<eor>")

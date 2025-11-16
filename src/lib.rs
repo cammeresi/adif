@@ -1,5 +1,14 @@
 #![warn(missing_docs)]
 
+#![deny(clippy::unimplemented)]
+#![deny(clippy::unreachable)]
+#![deny(clippy::todo)]
+
+#![cfg_attr(not(test), deny(clippy::panic))]
+#![cfg_attr(not(test), deny(clippy::unwrap_used))]
+#![cfg_attr(not(test), deny(clippy::expect_used))]
+#![cfg_attr(not(test), deny(clippy::indexing_slicing))]
+
 //! Parsing of Amateur Data Interchange Format (ADIF) data using asynchronous
 //! streams.
 //!
@@ -36,10 +45,15 @@
 //! into by key.
 //!
 //! A number of data normalizers are provided in the [filter] module that
-//! are intended to be generally useful at smoothing some of ADIF's roughest
-//! edges.  They are not necessarily complete, but the user can write
-//! additional normalizers to implement transformations not heretofore
-//! needed by the author.
+//! can be stacked on top of a [RecordStream] to automatically transform
+//! records as they are read.  They are intended to be generally useful at
+//! smoothing some of ADIF's roughest edges, but they are not necessarily
+//! every single transformation an application might desire.  The user can,
+//! however, write additional normalizers to implement additional
+//! transformations not heretofore envisioned by the author.
+//!
+//! The code in this crate strives to be panic-free, fully safe, and
+//! lightweight in terms of memory usage.
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use rust_decimal::Decimal;

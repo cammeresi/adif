@@ -69,7 +69,10 @@ impl TagDecoder {
             return Ok(None);
         }
 
-        let s = String::from_utf8_lossy(&src[begin..end]);
+        let Some(s) = src.get(begin..end) else {
+            return Ok(None); // shouldn't happen
+        };
+        let s = String::from_utf8_lossy(s);
         let value = match typ.as_deref() {
             Some("n") => {
                 let num = Decimal::from_str(&s)
@@ -113,12 +116,17 @@ impl Decoder for TagDecoder {
             return Ok(None);
         };
 
-        let Some(end) = src[begin..].iter().position(|&b| b == b'>') else {
-            return Ok(None);
+        let Some(remainder) = src.get(begin..) else {
+            return Ok(None); // shouldn't happen
+        };
+        let Some(end) = remainder.iter().position(|&b| b == b'>') else {
+            return Ok(None); // shouldn't happen
         };
 
         let (begin, end) = (begin + 1, begin + end);
-        let tag = &src[begin..end];
+        let Some(tag) = src.get(begin..end) else {
+            return Ok(None); // shouldn't happen
+        };
 
         if tag == b"eoh" {
             src.advance(end + 1);

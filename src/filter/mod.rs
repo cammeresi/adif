@@ -122,7 +122,10 @@ where
                 let date = if let Some(date_off) = date_off {
                     date_off
                 } else if time_off < time_on {
-                    date.checked_add_days(Days::new(1)).unwrap()
+                    match date.checked_add_days(Days::new(1)) {
+                        Some(d) => d,
+                        None => return,
+                    }
                 } else {
                     date
                 };

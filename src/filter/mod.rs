@@ -3,6 +3,7 @@
 use crate::{Datum, Error, Record};
 use chrono::{Days, NaiveDateTime};
 use futures::stream::Stream;
+use std::collections::HashSet;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -31,8 +32,7 @@ where
                 Poll::Ready(Some(Ok(record)))
             }
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
+            res => res,
         }
     }
 }
@@ -48,6 +48,48 @@ pub trait NormalizeExt: Stream {
 }
 
 impl<S> NormalizeExt for S where S: Stream {}
+
+pub struct Filter<S, F> {
+    stream: S,
+    f: F,
+}
+
+impl<S, F> Stream for Filter<S, F>
+where
+    S: Stream<Item = Result<Record, Error>> + Unpin,
+    F: FnMut(&Record) -> bool + Unpin,
+{
+    type Item = Result<Record, Error>;
+
+    fn poll_next(
+        self: Pin<&mut Self>, cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        loop {
+            match Pin::new(&mut this.stream).poll_next(cx) {
+                Poll::Ready(Some(Ok(record))) => {
+                    if (this.f)(&record) {
+                        return Poll::Ready(Some(Ok(record)));
+                    }
+                }
+                Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(e))),
+                res => return res,
+            }
+        }
+    }
+}
+
+pub trait FilterExt: Stream {
+    fn filter<F>(self, f: F) -> Filter<Self, F>
+    where
+        Self: Sized,
+        F: FnMut(&Record) -> bool,
+    {
+        Filter { stream: self, f }
+    }
+}
+
+impl<S> FilterExt for S where S: Stream {}
 
 pub fn normalize_times<S>(
     stream: S,
@@ -127,5 +169,22 @@ where
 
         let _ = record
             .insert(":band".to_string(), Datum::String(band.to_uppercase()));
+    })
+}
+
+pub fn exclude_callsigns<S>(
+    stream: S, callsigns: &[&str],
+) -> Filter<S, impl FnMut(&Record) -> bool>
+where
+    S: Stream<Item = Result<Record, Error>>,
+{
+    let exclude: HashSet<String> =
+        callsigns.iter().map(|c| c.to_uppercase()).collect();
+
+    stream.filter(move |record| {
+        let Some(call) = record.get("call").and_then(|c| c.as_str()) else {
+            return true;
+        };
+        !exclude.contains(&call.to_uppercase())
     })
 }

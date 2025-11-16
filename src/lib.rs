@@ -53,7 +53,7 @@ use thiserror::Error;
 pub mod filter;
 pub mod parse;
 
-pub use filter::NormalizeExt;
+pub use filter::{FilterExt, NormalizeExt};
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
 
 /// Errors that can occur during ADIF parsing and processing.

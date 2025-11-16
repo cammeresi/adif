@@ -12,22 +12,29 @@ fn dt(
         .unwrap()
 }
 
+async fn next<S>(stream: &mut S) -> Record
+where
+    S: Stream<Item = Result<Record, Error>> + Unpin,
+{
+    stream.next().await.unwrap().unwrap()
+}
+
 async fn parse_norm_times(adif_data: &str) -> Record {
     let stream = RecordStream::new(adif_data.as_bytes(), true);
     let mut normalized = normalize_times(stream);
-    normalized.next().await.unwrap().unwrap()
+    next(&mut normalized).await
 }
 
 async fn parse_norm_mode(adif_data: &str) -> Record {
     let stream = RecordStream::new(adif_data.as_bytes(), true);
     let mut normalized = normalize_mode(stream);
-    normalized.next().await.unwrap().unwrap()
+    next(&mut normalized).await
 }
 
 async fn parse_norm_band(adif_data: &str) -> Record {
     let stream = RecordStream::new(adif_data.as_bytes(), true);
     let mut normalized = normalize_band(stream);
-    normalized.next().await.unwrap().unwrap()
+    next(&mut normalized).await
 }
 
 #[tokio::test]
@@ -37,7 +44,7 @@ async fn duplicate_key_error() {
         true,
     );
     let mut normalized = normalize_times(stream);
-    let mut record = normalized.next().await.unwrap().unwrap();
+    let mut record = next(&mut normalized).await;
 
     let err = record
         .insert(":time_on".to_string(), Datum::String("test".to_string()))
@@ -225,4 +232,66 @@ async fn normalize_times_missing_time_on() {
     );
     assert!(record.get("time_on").is_none());
     assert!(record.get("time_off").is_none());
+}
+
+#[tokio::test]
+async fn exclude_single_callsign() {
+    let stream = RecordStream::new(
+        "<call:4>W1AW<eor><call:5>AB9BH<eor>".as_bytes(),
+        true,
+    );
+    let mut filtered = exclude_callsigns(stream, &["W1AW"]);
+    let record = next(&mut filtered).await;
+    assert_eq!(record.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert!(filtered.next().await.is_none());
+}
+
+#[tokio::test]
+async fn exclude_multiple_callsigns() {
+    let stream = RecordStream::new(
+        "<call:4>W1AW<eor><call:5>AB9BH<eor><call:4>W6RQ<eor>".as_bytes(),
+        true,
+    );
+    let mut filtered = exclude_callsigns(stream, &["W1AW", "W6RQ"]);
+    let record = next(&mut filtered).await;
+    assert_eq!(record.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert!(filtered.next().await.is_none());
+}
+
+#[tokio::test]
+async fn exclude_callsigns_case_insensitive() {
+    let stream = RecordStream::new(
+        "<call:4>W1AW<eor><call:5>AB9BH<eor>".as_bytes(),
+        true,
+    );
+    let mut filtered = exclude_callsigns(stream, &["w1aw"]);
+    let record = next(&mut filtered).await;
+    assert_eq!(record.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert!(filtered.next().await.is_none());
+}
+
+#[tokio::test]
+async fn exclude_callsigns_no_match() {
+    let stream = RecordStream::new(
+        "<call:4>W1AW<eor><call:5>AB9BH<eor>".as_bytes(),
+        true,
+    );
+    let mut filtered = exclude_callsigns(stream, &["W6RQ"]);
+    let r1 = next(&mut filtered).await;
+    assert_eq!(r1.get("call").unwrap().as_str().unwrap(), "W1AW");
+    let r2 = next(&mut filtered).await;
+    assert_eq!(r2.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert!(filtered.next().await.is_none());
+}
+
+#[tokio::test]
+async fn exclude_callsigns_missing_call() {
+    let stream = RecordStream::new(
+        "<freq:6>14.070<eor><call:4>W1AW<eor>".as_bytes(),
+        true,
+    );
+    let mut filtered = exclude_callsigns(stream, &["W1AW"]);
+    let r1 = next(&mut filtered).await;
+    assert!(r1.get("call").is_none());
+    assert!(filtered.next().await.is_none());
 }

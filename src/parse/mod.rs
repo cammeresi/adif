@@ -51,6 +51,37 @@ impl TagDecoder {
         Error::InvalidFormat(String::from_utf8_lossy(tag).to_string())
     }
 
+    fn parse_typed_value(
+        typ: Option<&str>, s: &str, tag: &[u8],
+    ) -> Result<Datum, Error> {
+        match typ {
+            Some("n") => {
+                let num =
+                    Decimal::from_str(s).map_err(|_| Self::invalid_tag(tag))?;
+                Ok(Datum::Number(num))
+            }
+            Some("b") => {
+                let b = match s.to_uppercase().as_str() {
+                    "Y" => true,
+                    "N" => false,
+                    _ => return Err(Self::invalid_tag(tag)),
+                };
+                Ok(Datum::Boolean(b))
+            }
+            Some("d") => {
+                let date = NaiveDate::parse_from_str(s, "%Y%m%d")
+                    .map_err(|_| Self::invalid_tag(tag))?;
+                Ok(Datum::Date(date))
+            }
+            Some("t") => {
+                let time = NaiveTime::parse_from_str(s, "%H%M%S")
+                    .map_err(|_| Self::invalid_tag(tag))?;
+                Ok(Datum::Time(time))
+            }
+            _ => Ok(Datum::String(s.to_string())),
+        }
+    }
+
     fn parse_value(
         tag: &[u8], end: usize, src: &BytesMut,
     ) -> Result<Option<(String, Datum, usize)>, Error> {
@@ -77,32 +108,7 @@ impl TagDecoder {
             return Ok(None); // shouldn't happen
         };
         let s = String::from_utf8_lossy(s);
-        let value = match typ.as_deref() {
-            Some("n") => {
-                let num = Decimal::from_str(&s)
-                    .map_err(|_| Self::invalid_tag(tag))?;
-                Datum::Number(num)
-            }
-            Some("b") => {
-                let b = match s.to_uppercase().as_str() {
-                    "Y" => true,
-                    "N" => false,
-                    _ => return Err(Self::invalid_tag(tag)),
-                };
-                Datum::Boolean(b)
-            }
-            Some("d") => {
-                let date = NaiveDate::parse_from_str(&s, "%Y%m%d")
-                    .map_err(|_| Self::invalid_tag(tag))?;
-                Datum::Date(date)
-            }
-            Some("t") => {
-                let time = NaiveTime::parse_from_str(&s, "%H%M%S")
-                    .map_err(|_| Self::invalid_tag(tag))?;
-                Datum::Time(time)
-            }
-            _ => Datum::String(s.to_string()),
-        };
+        let value = Self::parse_typed_value(typ.as_deref(), &s, tag)?;
 
         Ok(Some((name, value, end)))
     }

@@ -1,5 +1,5 @@
 use super::*;
-use crate::parse::RecordStream;
+use crate::parse::{RecordStream, TagStream};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use futures::StreamExt;
 
@@ -19,22 +19,26 @@ where
     stream.next().await.unwrap().unwrap()
 }
 
-async fn parse_norm_times(adif_data: &str) -> Record {
-    let stream = RecordStream::new(adif_data.as_bytes(), true);
-    let mut normalized = normalize_times(stream);
+async fn parse_with<'a, F, S>(adif: &'a str, f: F) -> Record
+where
+    F: FnOnce(RecordStream<TagStream<&'a [u8]>>) -> S,
+    S: Stream<Item = Result<Record, Error>> + Unpin,
+{
+    let stream = RecordStream::new(adif.as_bytes(), true);
+    let mut normalized = f(stream);
     next(&mut normalized).await
 }
 
-async fn parse_norm_mode(adif_data: &str) -> Record {
-    let stream = RecordStream::new(adif_data.as_bytes(), true);
-    let mut normalized = normalize_mode(stream);
-    next(&mut normalized).await
+async fn parse_norm_times(adif: &str) -> Record {
+    parse_with(adif, normalize_times).await
 }
 
-async fn parse_norm_band(adif_data: &str) -> Record {
-    let stream = RecordStream::new(adif_data.as_bytes(), true);
-    let mut normalized = normalize_band(stream);
-    next(&mut normalized).await
+async fn parse_norm_mode(adif: &str) -> Record {
+    parse_with(adif, normalize_mode).await
+}
+
+async fn parse_norm_band(adif: &str) -> Record {
+    parse_with(adif, normalize_band).await
 }
 
 #[tokio::test]

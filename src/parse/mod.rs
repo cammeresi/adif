@@ -128,10 +128,10 @@ impl Decoder for TagDecoder {
             return Ok(None); // shouldn't happen
         };
 
-        if tag == b"eoh" {
+        if tag.eq_ignore_ascii_case(b"eoh") {
             src.advance(end + 1);
             return Ok(Some(Tag::Eoh));
-        } else if tag == b"eor" {
+        } else if tag.eq_ignore_ascii_case(b"eor") {
             src.advance(end + 1);
             return Ok(Some(Tag::Eor));
         }

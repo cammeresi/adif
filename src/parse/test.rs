@@ -375,3 +375,33 @@ async fn as_str_roundtrip() {
     let s = datum.as_str().unwrap();
     assert_eq!(s, str);
 }
+
+#[tokio::test]
+async fn case_insensitive_markers() {
+    for variant in ["<EOH>", "<EoH>", "<Eoh>"] {
+        let input = format!("<adifver:5>3.1.1 {variant}");
+        let mut f = tags(&input);
+        next_field(&mut f).await;
+        next_eoh(&mut f).await;
+        no_tags(&mut f).await;
+    }
+
+    for variant in ["<EOR>", "<EoR>", "<Eor>"] {
+        let input = format!("<call:4>W1AW{variant}");
+        let mut f = tags(&input).records();
+        let rec = next_record(&mut f, false).await;
+        assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+        no_records(&mut f).await;
+    }
+
+    let mut f =
+        tags("<adifver:5>3.1.4 <EOH><call:4>W1AW<EOR><call:5>AB9BH<eor>")
+            .records();
+    let rec = next_record(&mut f, true).await;
+    assert_eq!(rec.get("adifver").unwrap().as_str().unwrap(), "3.1.4");
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    no_records(&mut f).await;
+}

@@ -27,13 +27,17 @@ pub struct TagDecoder {
 impl TagDecoder {
     /// Create a new stream that returns ADIF tags.
     ///
+    /// Tag names are converted to lowercase.
+    ///
     /// ```
     /// # tokio_test::block_on(async {
     /// use adif::TagDecoder;
     /// use futures::StreamExt;
-    /// let mut t = TagDecoder::new_stream("<foo:3>123".as_bytes(), true);
+    /// let mut t = TagDecoder::new_stream("<FOO:3>123".as_bytes(), true);
     /// let tag = t.next().await.unwrap().unwrap();
-    /// assert!(tag.as_field().is_some());
+    /// let field = tag.as_field().unwrap();
+    /// assert_eq!(field.name(), "foo");
+    /// assert_eq!(field.value().as_str().unwrap(), "123");
     /// # });
     /// ```
     pub fn new_stream<R>(reader: R, ignore_partial: bool) -> TagStream<R>
@@ -200,11 +204,12 @@ where
 {
     /// Create a new stream that returns ADIF records.
     ///
+    /// Tag names in the returned records are converted to lowercase.
     /// ```
     /// # tokio_test::block_on(async {
     /// use adif::RecordStream;
     /// use futures::StreamExt;
-    /// let mut r = RecordStream::new("<foo:3>123<eor>".as_bytes(), true);
+    /// let mut r = RecordStream::new("<FOO:3>123<eor>".as_bytes(), true);
     /// let rec = r.next().await.unwrap().unwrap();
     /// assert_eq!(rec.get("foo").unwrap().as_number().unwrap(), 123.into());
     /// # });

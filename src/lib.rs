@@ -122,7 +122,7 @@ impl Datum {
 
     /// Coerce any datum to a string representation.
     ///
-    /// String variants return borrowed data, all other types are returned in
+    /// String variants return borrowed data.  All other types are returned in
     /// ADIF format (boolean Y/N, date YYYYMMDD, time HHMMSS).
     pub fn as_str(&self) -> Option<Cow<'_, str>> {
         match self {
@@ -285,6 +285,9 @@ impl Record {
     /// Overwriting a previous value is not permitted and will return an
     /// error.  Transformations can only add new keys, not delete or replace
     /// them.
+    ///
+    /// Since colons cannot occur in tag names, a custom transformation may
+    /// wish to convert tag "xxx" to "myapp:xxx".
     ///
     /// ```
     /// # tokio_test::block_on(async {

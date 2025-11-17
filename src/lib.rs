@@ -140,6 +140,15 @@ impl Datum {
     }
 }
 
+impl<T> From<T> for Datum
+where
+    T: Borrow<str>,
+{
+    fn from(value: T) -> Self {
+        Datum::String(value.borrow().to_string())
+    }
+}
+
 /// A single tag in an ADIF stream and its associated value
 #[derive(Debug, PartialEq, Eq)]
 pub struct Field {

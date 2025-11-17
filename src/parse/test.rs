@@ -70,10 +70,10 @@ async fn header() {
 #[tokio::test]
 async fn typed() {
     let mut f = tags("<foo:3:n>123");
-
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "foo");
-    assert_eq!(field.value().as_number().unwrap().to_string(), "123");
+    let num = field.value().as_number().unwrap();
+    assert_eq!(num, Decimal::from_str("123").unwrap());
     no_tags(&mut f).await;
 }
 
@@ -83,8 +83,8 @@ async fn fraction() {
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "freq");
-    let num = field.value().as_number().unwrap();
-    assert_eq!(num.to_string(), "14.0705");
+    let freq = field.value().as_number().unwrap();
+    assert_eq!(freq, Decimal::from_str("14.0705").unwrap());
     no_tags(&mut f).await;
 }
 
@@ -164,7 +164,10 @@ async fn try_trickle(chunk: usize) {
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "qux");
-    assert_eq!(field.value().as_number().unwrap().to_string(), "12345");
+    assert_eq!(
+        field.value().as_number().unwrap(),
+        Decimal::from_str("12345").unwrap()
+    );
 
     next_eoh(&mut f).await;
     no_tags(&mut f).await;
@@ -182,7 +185,6 @@ async fn records() {
     let mut f =
         tags("<adifver:5>3.1.4 <eoh><call:4>W1AW<eor><call:5>AB9BH<eor>")
             .records();
-
     let rec = next_record(&mut f, true).await;
     assert_eq!(rec.get("adifver").unwrap().as_str().unwrap(), "3.1.4");
 

@@ -162,7 +162,9 @@ where
         let mode = match sub {
             Some(sub)
                 if mode.eq_ignore_ascii_case("MFSK")
-                    && MFSK_SUBMODES.contains(&sub.to_uppercase().as_str()) =>
+                    && MFSK_SUBMODES
+                        .iter()
+                        .any(|m| m.eq_ignore_ascii_case(&sub)) =>
             {
                 sub
             }
@@ -207,7 +209,7 @@ where
         let Some(call) = record.get("call").and_then(|c| c.as_str()) else {
             return true;
         };
-        !exclude.contains(&call.to_uppercase())
+        !exclude.iter().any(|e| e.eq_ignore_ascii_case(&call))
     })
 }
 

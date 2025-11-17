@@ -127,9 +127,7 @@ impl Datum {
     pub fn as_str(&self) -> Option<Cow<'_, str>> {
         match self {
             Self::String(s) => Some(Cow::Borrowed(s)),
-            Self::Boolean(b) => {
-                Some(Cow::Owned(if *b { "Y" } else { "N" }.to_string()))
-            }
+            Self::Boolean(b) => Some(Cow::Borrowed(if *b { "Y" } else { "N" })),
             Self::Number(n) => Some(Cow::Owned(n.to_string())),
             Self::Date(d) => Some(Cow::Owned(d.format("%Y%m%d").to_string())),
             Self::Time(t) => Some(Cow::Owned(t.format("%H%M%S").to_string())),

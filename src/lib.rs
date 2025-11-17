@@ -200,13 +200,42 @@ impl Tag {
 }
 
 /// A single contact record, composed of multiple data fields
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Record {
     header: bool,
     fields: HashMap<String, Datum>,
 }
 
 impl Record {
+    /// Create a new record.
+    ///
+    /// ```
+    /// use adif::Record;
+    /// let mut record = Record::new();
+    /// record.insert("call".to_string(), "W1AW".into()).unwrap();
+    /// record.insert("freq".to_string(), "14.074".into()).unwrap();
+    /// assert_eq!(record.get("call").unwrap().as_str().unwrap(), "W1AW");
+    /// ```
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a new header record.
+    ///
+    /// ```
+    /// use adif::Record;
+    /// let mut header = Record::new_header();
+    /// header.insert("adifver".to_string(), "3.1.4".into()).unwrap();
+    /// assert!(header.is_header());
+    /// assert_eq!(header.get("adifver").unwrap().as_str().unwrap(), "3.1.4");
+    /// ```
+    pub fn new_header() -> Self {
+        Self {
+            header: true,
+            ..Default::default()
+        }
+    }
+
     /// True if this record represents an ADIF header.
     ///
     /// ```

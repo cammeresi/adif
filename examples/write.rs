@@ -5,8 +5,8 @@ use std::str::FromStr;
 
 fn create_header() -> Result<Record, Box<dyn std::error::Error>> {
     let mut header = Record::new_header();
-    header.insert("adifver".into(), "3.1.4".into())?;
-    header.insert("programid".into(), "Example".into())?;
+    header.insert("adifver", "3.1.4")?;
+    header.insert("programid", "Example")?;
     Ok(header)
 }
 
@@ -14,11 +14,11 @@ fn create_qso(
     call: &str, date: &str, time: &str, freq: &str, mode: &str,
 ) -> Result<Record, Box<dyn std::error::Error>> {
     let mut record = Record::new();
-    record.insert("call".into(), call.into())?;
-    record.insert("qso_date".into(), date.into())?;
-    record.insert("time_on".into(), time.into())?;
-    record.insert("freq".into(), Datum::Number(Decimal::from_str(freq)?))?;
-    record.insert("mode".into(), mode.into())?;
+    record.insert("call", call)?;
+    record.insert("qso_date", date)?;
+    record.insert("time_on", time)?;
+    record.insert("freq", Datum::Number(Decimal::from_str(freq)?))?;
+    record.insert("mode", mode)?;
     Ok(record)
 }
 

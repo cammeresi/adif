@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(freq) = record.get("freq").and_then(|f| f.as_number())
             && let Some(band) = freq_to_band(freq)
         {
-            let _ = record.insert("band".to_string(), band.into());
+            let _ = record.insert("band", band);
         }
     });
 

@@ -113,8 +113,8 @@ async fn datetime_errors() {
 #[tokio::test]
 async fn record_sink_basic() {
     let mut record = Record::new();
-    record.insert("call".into(), "W1AW".into()).unwrap();
-    record.insert("freq".into(), "14.074".into()).unwrap();
+    record.insert("call", "W1AW").unwrap();
+    record.insert("freq", "14.074").unwrap();
 
     let buf = encode_record(record, OutputTypes::Never).await;
 
@@ -127,7 +127,7 @@ async fn record_sink_basic() {
 #[tokio::test]
 async fn record_sink_header() {
     let mut header = Record::new_header();
-    header.insert("adifver".into(), "3.1.4".into()).unwrap();
+    header.insert("adifver", "3.1.4").unwrap();
 
     let buf = encode_record(header, OutputTypes::Never).await;
 
@@ -140,16 +140,13 @@ fn create_test_record(
     call: &str, date: &str, time: &str, freq: &str, mode: &str,
 ) -> Record {
     let mut record = Record::new();
-    record.insert("call".into(), call.into()).unwrap();
-    record.insert("qso_date".into(), date.into()).unwrap();
-    record.insert("time_on".into(), time.into()).unwrap();
+    record.insert("call", call).unwrap();
+    record.insert("qso_date", date).unwrap();
+    record.insert("time_on", time).unwrap();
     record
-        .insert(
-            "freq".into(),
-            Datum::Number(Decimal::from_str(freq).unwrap()),
-        )
+        .insert("freq", Datum::Number(Decimal::from_str(freq).unwrap()))
         .unwrap();
-    record.insert("mode".into(), mode.into()).unwrap();
+    record.insert("mode", mode).unwrap();
     record
 }
 
@@ -173,19 +170,16 @@ async fn record_field_order() {
     for (f1, f2) in fields1.iter().zip(fields2.iter()) {
         let name1 = f1.split(':').next().unwrap();
         let name2 = f2.split(':').next().unwrap();
-        assert_eq!(name1, name2, "Field order mismatch");
+        assert_eq!(name1, name2, "field order mismatch");
     }
 }
 
 #[tokio::test]
 async fn record_roundtrip() {
     let mut record = Record::new();
-    record.insert("call".into(), "AB9BH".into()).unwrap();
+    record.insert("call", "AB9BH").unwrap();
     record
-        .insert(
-            "freq".into(),
-            Datum::Number(Decimal::from_str("7.074").unwrap()),
-        )
+        .insert("freq", Datum::Number(Decimal::from_str("7.074").unwrap()))
         .unwrap();
 
     let buf = encode_record(record.clone(), OutputTypes::OnlyNonString).await;

@@ -50,9 +50,7 @@ async fn duplicate_key_error() {
     let mut normalized = normalize_times(stream);
     let mut record = next(&mut normalized).await;
 
-    let err = record
-        .insert(":time_on".to_string(), Datum::String("test".to_string()))
-        .unwrap_err();
+    let err = record.insert(":time_on", "test").unwrap_err();
     match err {
         Error::InvalidFormat(s) => assert_eq!(s, "duplicate key: :time_on"),
         _ => panic!("expected InvalidFormat error"),

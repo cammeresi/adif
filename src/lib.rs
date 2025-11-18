@@ -237,8 +237,8 @@ impl Record {
     /// ```
     /// use adif::Record;
     /// let mut record = Record::new();
-    /// record.insert("call".to_string(), "W1AW".into()).unwrap();
-    /// record.insert("freq".to_string(), "14.074".into()).unwrap();
+    /// record.insert("call", "W1AW").unwrap();
+    /// record.insert("freq", "14.074").unwrap();
     /// assert_eq!(record.get("call").unwrap().as_str().unwrap(), "W1AW");
     /// ```
     pub fn new() -> Self {
@@ -250,7 +250,7 @@ impl Record {
     /// ```
     /// use adif::Record;
     /// let mut header = Record::new_header();
-    /// header.insert("adifver".to_string(), "3.1.4".into()).unwrap();
+    /// header.insert("adifver", "3.1.4").unwrap();
     /// assert!(header.is_header());
     /// assert_eq!(header.get("adifver").unwrap().as_str().unwrap(), "3.1.4");
     /// ```
@@ -338,14 +338,19 @@ impl Record {
     /// assert!(err.is_err());
     /// # });
     /// ```
-    pub fn insert(&mut self, name: String, value: Datum) -> Result<(), Error> {
+    pub fn insert<N, V>(&mut self, name: N, value: V) -> Result<(), Error>
+    where
+        N: Into<String>,
+        V: Into<Datum>,
+    {
+        let name = name.into();
         if self.fields.contains_key(&name) {
             return Err(Error::InvalidFormat(format!(
                 "duplicate key: {}",
                 name
             )));
         }
-        self.fields.insert(name, value);
+        self.fields.insert(name, value.into());
         Ok(())
     }
 }

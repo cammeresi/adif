@@ -1,8 +1,11 @@
-use super::*;
-use crate::{Datum, Field, Record, RecordStream, Tag};
+use std::str::FromStr;
+
+use chrono::{NaiveDate, NaiveTime};
 use futures::{SinkExt, StreamExt};
 use rust_decimal::Decimal;
-use std::str::FromStr;
+
+use super::*;
+use crate::{Datum, Field, Record, RecordStream, Tag};
 
 async fn encode_tag(tag: Tag, types: OutputTypes) -> Vec<u8> {
     let mut buf = Vec::new();
@@ -51,14 +54,14 @@ async fn encode_eor() {
 
 #[tokio::test]
 async fn encode_boolean() {
-    encode_field(Datum::Boolean(true), "<f:1:b>Y", "<f:1:b>Y", "<f:1>Y").await;
-    encode_field(Datum::Boolean(false), "<f:1:b>N", "<f:1:b>N", "<f:1>N").await;
+    encode_field(true.into(), "<f:1:b>Y", "<f:1:b>Y", "<f:1>Y").await;
+    encode_field(false.into(), "<f:1:b>N", "<f:1:b>N", "<f:1>N").await;
 }
 
 #[tokio::test]
 async fn encode_number() {
     encode_field(
-        Datum::Number(Decimal::from_str("14.074").unwrap()),
+        Decimal::from_str("14.074").unwrap().into(),
         "<f:6:n>14.074",
         "<f:6:n>14.074",
         "<f:6>14.074",
@@ -69,7 +72,7 @@ async fn encode_number() {
 #[tokio::test]
 async fn encode_date() {
     encode_field(
-        Datum::Date(chrono::NaiveDate::from_ymd_opt(2024, 1, 15).unwrap()),
+        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap().into(),
         "<f:8:d>20240115",
         "<f:8:d>20240115",
         "<f:8>20240115",
@@ -80,7 +83,7 @@ async fn encode_date() {
 #[tokio::test]
 async fn encode_time() {
     encode_field(
-        Datum::Time(chrono::NaiveTime::from_hms_opt(14, 30, 0).unwrap()),
+        NaiveTime::from_hms_opt(14, 30, 0).unwrap().into(),
         "<f:6:t>143000",
         "<f:6:t>143000",
         "<f:6>143000",
@@ -97,12 +100,10 @@ async fn encode_string() {
 async fn datetime_errors() {
     let field = Field::new(
         "timestamp",
-        Datum::DateTime(
-            chrono::NaiveDate::from_ymd_opt(2024, 1, 15)
-                .unwrap()
-                .and_hms_opt(14, 30, 0)
-                .unwrap(),
-        ),
+        NaiveDate::from_ymd_opt(2024, 1, 15)
+            .unwrap()
+            .and_hms_opt(14, 30, 0)
+            .unwrap(),
     );
     let mut buf = Vec::new();
     let mut sink = TagEncoder::new().tag_sink_with(&mut buf);
@@ -144,7 +145,7 @@ fn create_test_record(
     record.insert("qso_date", date).unwrap();
     record.insert("time_on", time).unwrap();
     record
-        .insert("freq", Datum::Number(Decimal::from_str(freq).unwrap()))
+        .insert("freq", Decimal::from_str(freq).unwrap())
         .unwrap();
     record.insert("mode", mode).unwrap();
     record
@@ -179,7 +180,7 @@ async fn record_roundtrip() {
     let mut record = Record::new();
     record.insert("call", "AB9BH").unwrap();
     record
-        .insert("freq", Datum::Number(Decimal::from_str("7.074").unwrap()))
+        .insert("freq", Decimal::from_str("7.074").unwrap())
         .unwrap();
 
     let buf = encode_record(record.clone(), OutputTypes::OnlyNonString).await;

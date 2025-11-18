@@ -153,12 +153,45 @@ impl Datum {
     }
 }
 
-impl<T> From<T> for Datum
-where
-    T: Borrow<str>,
-{
-    fn from(value: T) -> Self {
-        Datum::String(value.borrow().to_string())
+impl From<&str> for Datum {
+    fn from(value: &str) -> Self {
+        Datum::String(value.to_string())
+    }
+}
+
+impl From<String> for Datum {
+    fn from(value: String) -> Self {
+        Datum::String(value)
+    }
+}
+
+impl From<bool> for Datum {
+    fn from(value: bool) -> Self {
+        Datum::Boolean(value)
+    }
+}
+
+impl From<Decimal> for Datum {
+    fn from(value: Decimal) -> Self {
+        Datum::Number(value)
+    }
+}
+
+impl From<NaiveDate> for Datum {
+    fn from(value: NaiveDate) -> Self {
+        Datum::Date(value)
+    }
+}
+
+impl From<NaiveTime> for Datum {
+    fn from(value: NaiveTime) -> Self {
+        Datum::Time(value)
+    }
+}
+
+impl From<NaiveDateTime> for Datum {
+    fn from(value: NaiveDateTime) -> Self {
+        Datum::DateTime(value)
     }
 }
 

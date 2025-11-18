@@ -94,7 +94,7 @@ async fn uppercase() {
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "foo");
-    assert_eq!(field.value(), &Datum::String("Bar".to_string()));
+    assert_eq!(field.value(), &"Bar".into());
     no_tags(&mut f).await;
 }
 
@@ -104,7 +104,7 @@ async fn underscore() {
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "my_tag");
-    assert_eq!(field.value(), &Datum::String("xyz".to_string()));
+    assert_eq!(field.value(), &"xyz".into());
     no_tags(&mut f).await;
 }
 
@@ -114,7 +114,7 @@ async fn lotw_eof() {
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "foo");
-    assert_eq!(field.value(), &Datum::String("bar".to_string()));
+    assert_eq!(field.value(), &"bar".into());
     no_tags(&mut f).await;
 }
 

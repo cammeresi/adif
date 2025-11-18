@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["Sidney Cammeresi <sac@cheesecake.org>"]
 license = "BSD-3-Clause"
-readme = "README"
+readme = "README.md"
 description = "Parsing of Amateur Data Interchange Format (ADIF) files"
 repository = "https://github.com/cammeresi/adif.git"
 

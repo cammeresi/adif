@@ -70,6 +70,8 @@ pub enum Datum {
 
 impl Datum {
     /// Return a [bool] value or coerce a string thereto.
+    ///
+    /// Returns [None] if a string value fails to parse.
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Self::Boolean(b) => Some(*b),
@@ -83,6 +85,8 @@ impl Datum {
     }
 
     /// Return a numeric value as a [Decimal] or coerce a string thereto.
+    ///
+    /// Returns [None] if a string value fails to parse.
     pub fn as_number(&self) -> Option<Decimal> {
         match self {
             Self::Number(n) => Some(*n),
@@ -92,6 +96,8 @@ impl Datum {
     }
 
     /// Return a date value as a [NaiveDate] or coerce a string thereto.
+    ///
+    /// Returns [None] if a string value fails to parse.
     pub fn as_date(&self) -> Option<NaiveDate> {
         match self {
             Self::Date(d) => Some(*d),
@@ -101,6 +107,8 @@ impl Datum {
     }
 
     /// Return a time value as a [NaiveTime] or coerce a string thereto.
+    ///
+    /// Returns [None] if a string value fails to parse.
     pub fn as_time(&self) -> Option<NaiveTime> {
         match self {
             Self::Time(t) => Some(*t),
@@ -110,6 +118,8 @@ impl Datum {
     }
 
     /// Return a datetime value as a [NaiveDateTime] or coerce a string thereto.
+    ///
+    /// Returns [None] if a string value fails to parse.
     pub fn as_datetime(&self) -> Option<NaiveDateTime> {
         match self {
             Self::DateTime(dt) => Some(*dt),

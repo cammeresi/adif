@@ -20,9 +20,10 @@ This parser is intended to be maximally flexible and provide the user
 with parsed ADIF data from any source at any level with or without
 preprocessing.
 
-Input is read from a stream.  File input is not assumed.  Trailing data
-in the form of a partial tag or record can be ignored or return an
-error.
+Input is read from a stream.  File input is not assumed.  Reading an
+entire file is not assumed; it's fine to start in the middle.  Trailing
+data in the form of a partial tag or record can be ignored or return an
+error.  Leading text is ignored.
 
 The code in this crate strives to be panic-free, fully safe, and
 lightweight in terms of memory usage.

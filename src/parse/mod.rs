@@ -4,8 +4,8 @@ use crate::{Datum, Error, Field, Record, Tag};
 use bytes::{Buf, BytesMut};
 use chrono::{NaiveDate, NaiveTime};
 use futures::stream::Stream;
+use indexmap::IndexMap;
 use rust_decimal::Decimal;
-use std::collections::HashMap;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::task::{Context, Poll};
@@ -187,7 +187,7 @@ pub trait RecordStreamExt: Stream {
     {
         RecordStream {
             stream: self,
-            fields: HashMap::new(),
+            fields: IndexMap::new(),
         }
     }
 }
@@ -197,7 +197,7 @@ impl<S> RecordStreamExt for S where S: Stream {}
 /// Stream that aggregates ADIF tags into complete records.
 pub struct RecordStream<S> {
     stream: S,
-    fields: HashMap<String, Datum>,
+    fields: IndexMap<String, Datum>,
 }
 
 impl<S> RecordStream<S> {

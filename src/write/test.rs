@@ -139,6 +139,47 @@ async fn record_sink_header() {
     assert!(output.contains("<eoh>\n"));
 }
 
+fn create_test_record(
+    call: &str, date: &str, time: &str, freq: &str, mode: &str,
+) -> Record {
+    let mut record = Record::new();
+    record.insert("call".into(), call.into()).unwrap();
+    record.insert("qso_date".into(), date.into()).unwrap();
+    record.insert("time_on".into(), time.into()).unwrap();
+    record
+        .insert(
+            "freq".into(),
+            Datum::Number(Decimal::from_str(freq).unwrap()),
+        )
+        .unwrap();
+    record.insert("mode".into(), mode.into()).unwrap();
+    record
+}
+
+#[tokio::test]
+async fn record_field_order() {
+    let record1 =
+        create_test_record("W1AW", "20240115", "143000", "14.074", "FT8");
+    let record2 =
+        create_test_record("AB9BH", "20240115", "150000", "7.074", "FT8");
+
+    let buf1 = encode_record(record1, OutputTypes::Never).await;
+    let buf2 = encode_record(record2, OutputTypes::Never).await;
+
+    let output1 = String::from_utf8(buf1).unwrap();
+    let output2 = String::from_utf8(buf2).unwrap();
+
+    let fields1: Vec<&str> = output1.split('<').skip(1).collect();
+    let fields2: Vec<&str> = output2.split('<').skip(1).collect();
+
+    assert_eq!(fields1.len(), fields2.len());
+    for (f1, f2) in fields1.iter().zip(fields2.iter()) {
+        let name1 = f1.split(':').next().unwrap();
+        let name2 = f2.split(':').next().unwrap();
+        assert_eq!(name1, name2, "Field order mismatch");
+    }
+}
+
 #[tokio::test]
 async fn record_roundtrip() {
     let mut record = Record::new();

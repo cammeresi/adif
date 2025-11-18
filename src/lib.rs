@@ -9,9 +9,9 @@
 #![doc = include_str!("../README.md")]
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use indexmap::IndexMap;
 use rust_decimal::Decimal;
 use std::borrow::{Borrow, Cow};
-use std::collections::HashMap;
 use std::hash::Hash;
 use std::io;
 use std::str::FromStr;
@@ -216,7 +216,7 @@ impl Tag {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Record {
     header: bool,
-    fields: HashMap<String, Datum>,
+    fields: IndexMap<String, Datum>,
 }
 
 impl Record {

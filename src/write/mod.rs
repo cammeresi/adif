@@ -117,6 +117,20 @@ impl<W> TagSinkExt for W where W: AsyncWrite {}
 
 impl TagEncoder {
     /// Create a sink from this encoder and a writer.
+    ///
+    /// ```
+    /// use adif::{Field, Tag, TagEncoder};
+    /// use futures::SinkExt;
+    ///
+    /// # tokio_test::block_on(async {
+    /// let mut buf = Vec::new();
+    /// let mut sink = TagEncoder::new().tag_sink_with(&mut buf);
+    /// let field = Field::new("call", "W1AW");
+    /// sink.send(Tag::Field(field)).await.unwrap();
+    /// sink.close().await.unwrap();
+    /// assert_eq!(buf, b"<call:4>W1AW");
+    /// # })
+    /// ```
     pub fn tag_sink_with<W>(self, writer: W) -> TagSink<W>
     where
         W: AsyncWrite,
@@ -135,6 +149,23 @@ where
     W: AsyncWrite + Unpin,
 {
     /// Create a new RecordSink with default configuration.
+    ///
+    /// ```
+    /// use adif::{Record, RecordSink};
+    /// use futures::SinkExt;
+    ///
+    /// # tokio_test::block_on(async {
+    /// let mut buf = Vec::new();
+    /// let mut sink = RecordSink::new(&mut buf);
+    ///
+    /// let mut record = Record::new();
+    /// record.insert("call", "W1AW").unwrap();
+    /// sink.send(record).await.unwrap();
+    /// sink.close().await.unwrap();
+    ///
+    /// assert_eq!(buf, b"<call:4>W1AW<eor>\n");
+    /// # })
+    /// ```
     pub fn new(writer: W) -> Self {
         Self {
             inner: TagEncoder::new().tag_sink_with(writer),

@@ -19,12 +19,14 @@ use thiserror::Error;
 
 pub mod filter;
 pub mod parse;
+pub mod write;
 
 #[cfg(test)]
 mod test;
 
 pub use filter::{FilterExt, NormalizeExt};
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
+pub use write::{OutputTypes, RecordSink, TagEncoder, TagSink, TagSinkExt};
 
 /// Errors that can occur during ADIF parsing and processing.
 #[derive(Debug, Error)]
@@ -161,7 +163,7 @@ where
 }
 
 /// A single tag in an ADIF stream and its associated value
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Field {
     name: String,
     value: Datum,
@@ -211,7 +213,7 @@ impl Tag {
 }
 
 /// A single contact record, composed of multiple data fields
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Record {
     header: bool,
     fields: HashMap<String, Datum>,
@@ -289,6 +291,11 @@ impl Record {
         Q: Hash + Eq + ?Sized,
     {
         self.fields.get(name)
+    }
+
+    /// Return an iterator over all fields in this record.
+    pub fn fields(&self) -> impl Iterator<Item = (&String, &Datum)> {
+        self.fields.iter()
     }
 
     /// Add a field to the record.

@@ -99,6 +99,26 @@ async fn uppercase() {
 }
 
 #[tokio::test]
+async fn underscore() {
+    let mut f = tags("<my_tag:3>xyz");
+
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "my_tag");
+    assert_eq!(field.value(), &Datum::String("xyz".to_string()));
+    no_tags(&mut f).await;
+}
+
+#[tokio::test]
+async fn lotw_eof() {
+    let mut f = tags("<foo:3>bar<app_lotw_eof><baz:3>qux");
+
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "foo");
+    assert_eq!(field.value(), &Datum::String("bar".to_string()));
+    no_tags(&mut f).await;
+}
+
+#[tokio::test]
 async fn partial_tag_ignore() {
     let s = "<foo:3>ba";
     for i in 0..s.len() {
@@ -279,6 +299,19 @@ async fn coerce_time_from_string() {
 }
 
 #[tokio::test]
+async fn coerce_datetime_from_string() {
+    let mut f =
+        RecordStream::new("<dt:15>20240101 143000<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    let dt = rec.get("dt").unwrap().as_datetime().unwrap();
+    let expected = NaiveDateTime::new(
+        NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+        NaiveTime::from_hms_opt(14, 30, 0).unwrap(),
+    );
+    assert_eq!(dt, expected);
+}
+
+#[tokio::test]
 async fn coerce_invalid_number() {
     let mut f = RecordStream::new("<freq:7>invalid<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
@@ -297,6 +330,13 @@ async fn coerce_invalid_time() {
     let mut f = RecordStream::new("<time_on:7>invalid<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     assert!(rec.get("time_on").unwrap().as_time().is_none());
+}
+
+#[tokio::test]
+async fn coerce_invalid_datetime() {
+    let mut f = RecordStream::new("<dt:7>invalid<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert!(rec.get("dt").unwrap().as_datetime().is_none());
 }
 
 #[tokio::test]
@@ -406,4 +446,39 @@ async fn case_insensitive_markers() {
     let rec = next_record(&mut f, false).await;
     assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
     no_records(&mut f).await;
+}
+
+#[tokio::test]
+async fn empty_field() {
+    let mut f = RecordStream::new("<call:0><eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "");
+}
+
+#[tokio::test]
+async fn field_missing_length() {
+    let mut f = RecordStream::new("<call:><eor>".as_bytes(), true);
+    let err = f.next().await.unwrap().unwrap_err();
+    match err {
+        Error::InvalidFormat(s) => assert_eq!(s, "call:"),
+        _ => panic!("expected InvalidFormat error"),
+    }
+}
+
+#[tokio::test]
+async fn field_negative_length() {
+    let mut f = RecordStream::new("<call:-1><eor>".as_bytes(), true);
+    let err = f.next().await.unwrap().unwrap_err();
+    match err {
+        Error::InvalidFormat(s) => assert_eq!(s, "call:-1"),
+        _ => panic!("expected InvalidFormat error"),
+    }
+}
+
+#[tokio::test]
+async fn non_ascii_value() {
+    // not sure now good of an idea this is, but it works
+    let mut f = RecordStream::new("<name:6>André<eor>".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("name").unwrap().as_str().unwrap(), "André");
 }

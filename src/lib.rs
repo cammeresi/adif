@@ -20,6 +20,9 @@ use thiserror::Error;
 pub mod filter;
 pub mod parse;
 
+#[cfg(test)]
+mod test;
+
 pub use filter::{FilterExt, NormalizeExt};
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
 

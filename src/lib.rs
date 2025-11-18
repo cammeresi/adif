@@ -170,6 +170,18 @@ pub struct Field {
 }
 
 impl Field {
+    /// Create a new field.
+    pub fn new<N, V>(name: N, value: V) -> Self
+    where
+        N: Into<String>,
+        V: Into<Datum>,
+    {
+        Self {
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+
     /// Return name of the tag.
     pub fn name(&self) -> &str {
         &self.name

@@ -154,7 +154,7 @@ impl Decoder for TagDecoder {
         };
         src.advance(end);
 
-        Ok(Some(Tag::Field(Field { name, value })))
+        Ok(Some(Tag::Field(Field::new(name, value))))
     }
 
     fn decode_eof(

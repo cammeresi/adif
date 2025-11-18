@@ -15,10 +15,7 @@ async fn encode_tag(tag: Tag, types: OutputTypes) -> Vec<u8> {
 async fn encode_field(
     value: Datum, always: &str, only_non_string: &str, never: &str,
 ) {
-    let field = Field {
-        name: "f".to_string(),
-        value,
-    };
+    let field = Field::new("f", value);
     let out = encode_tag(Tag::Field(field.clone()), OutputTypes::Always).await;
     assert_eq!(out.as_slice(), always.as_bytes(), "failed on Always");
     let out =
@@ -98,15 +95,15 @@ async fn encode_string() {
 
 #[tokio::test]
 async fn datetime_errors() {
-    let field = Field {
-        name: "timestamp".into(),
-        value: Datum::DateTime(
+    let field = Field::new(
+        "timestamp",
+        Datum::DateTime(
             chrono::NaiveDate::from_ymd_opt(2024, 1, 15)
                 .unwrap()
                 .and_hms_opt(14, 30, 0)
                 .unwrap(),
         ),
-    };
+    );
     let mut buf = Vec::new();
     let mut sink = TagEncoder::new().tag_sink_with(&mut buf);
     let result = sink.send(Tag::Field(field)).await;

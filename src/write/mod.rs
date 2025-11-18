@@ -165,10 +165,7 @@ where
         mut self: Pin<&mut Self>, item: Record,
     ) -> Result<(), Self::Error> {
         for (name, value) in item.fields() {
-            let field = Field {
-                name: name.clone(),
-                value: value.clone(),
-            };
+            let field = Field::new(name.clone(), value.clone());
             Pin::new(&mut self.inner).start_send(Tag::Field(field))?;
         }
 

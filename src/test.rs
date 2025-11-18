@@ -2,10 +2,7 @@ use super::*;
 
 #[test]
 fn tag_as_field_returns_some_for_field() {
-    let field = Field {
-        name: "call".to_string(),
-        value: "W1AW".into(),
-    };
+    let field = Field::new("call", "W1AW");
     let tag = Tag::Field(field);
     assert!(tag.as_field().is_some());
     assert_eq!(tag.as_field().unwrap().name(), "call");
@@ -37,10 +34,7 @@ fn tag_is_eoh_false_for_eor() {
 
 #[test]
 fn tag_is_eoh_false_for_field() {
-    let field = Field {
-        name: "call".to_string(),
-        value: "W1AW".into(),
-    };
+    let field = Field::new("call", "W1AW");
     let tag = Tag::Field(field);
     assert!(!tag.is_eoh());
 }
@@ -59,10 +53,7 @@ fn tag_is_eor_false_for_eoh() {
 
 #[test]
 fn tag_is_eor_false_for_field() {
-    let field = Field {
-        name: "call".to_string(),
-        value: "W1AW".into(),
-    };
+    let field = Field::new("call", "W1AW");
     let tag = Tag::Field(field);
     assert!(!tag.is_eor());
 }

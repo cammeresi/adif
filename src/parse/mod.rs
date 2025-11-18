@@ -144,6 +144,9 @@ impl Decoder for TagDecoder {
         } else if tag.eq_ignore_ascii_case(b"eor") {
             src.advance(end + 1);
             return Ok(Some(Tag::Eor));
+        } else if tag.eq_ignore_ascii_case(b"app_lotw_eof") {
+            src.clear();
+            return Ok(None);
         }
 
         let Some((name, value, end)) = Self::parse_value(tag, end, src)? else {

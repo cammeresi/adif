@@ -9,7 +9,7 @@
 #![doc = include_str!("../README.md")]
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, map::Entry};
 use rust_decimal::Decimal;
 use std::borrow::{Borrow, Cow};
 use std::hash::Hash;
@@ -377,13 +377,14 @@ impl Record {
         V: Into<Datum>,
     {
         let name = name.into();
-        if self.fields.contains_key(&name) {
-            return Err(Error::InvalidFormat(format!(
-                "duplicate key: {}",
-                name
-            )));
+        match self.fields.entry(name) {
+            Entry::Occupied(e) => {
+                Err(Error::InvalidFormat(format!("duplicate key: {}", e.key())))
+            }
+            Entry::Vacant(e) => {
+                e.insert(value.into());
+                Ok(())
+            }
         }
-        self.fields.insert(name, value.into());
-        Ok(())
     }
 }

@@ -31,13 +31,59 @@ pub struct TagEncoder {
 
 impl TagEncoder {
     /// Create a new TagEncoder with default configuration.
+    ///
+    /// ```
+    /// use adif::{Field, Tag, TagEncoder};
+    /// use bytes::BytesMut;
+    /// use tokio_util::codec::Encoder;
+    ///
+    /// let mut encoder = TagEncoder::new();
+    /// let mut buf = BytesMut::new();
+    /// let field = Field::new("call", "W1AW");
+    /// encoder.encode(Tag::Field(field), &mut buf).unwrap();
+    /// assert_eq!(&buf[..], b"<call:4>W1AW");
+    /// ```
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Create a new TagEncoder with specified type specifier behavior.
+    ///
+    /// ```
+    /// use adif::{Field, OutputTypes, Tag, TagEncoder};
+    /// use bytes::BytesMut;
+    /// use tokio_util::codec::Encoder;
+    ///
+    /// let mut encoder = TagEncoder::with_types(OutputTypes::Always);
+    /// let mut buf = BytesMut::new();
+    /// let field = Field::new("call", "W1AW");
+    /// encoder.encode(Tag::Field(field), &mut buf).unwrap();
+    /// assert_eq!(&buf[..], b"<call:4:s>W1AW");
+    /// ```
     pub fn with_types(types: OutputTypes) -> Self {
         Self { types }
+    }
+
+    /// Create a sink from this encoder and a writer.
+    ///
+    /// ```
+    /// use adif::{Field, Tag, TagEncoder};
+    /// use futures::SinkExt;
+    ///
+    /// # tokio_test::block_on(async {
+    /// let mut buf = Vec::new();
+    /// let mut sink = TagEncoder::new().tag_sink_with(&mut buf);
+    /// let field = Field::new("call", "W1AW");
+    /// sink.send(Tag::Field(field)).await.unwrap();
+    /// sink.close().await.unwrap();
+    /// assert_eq!(buf, b"<call:4>W1AW");
+    /// # })
+    /// ```
+    pub fn tag_sink_with<W>(self, writer: W) -> TagSink<W>
+    where
+        W: AsyncWrite,
+    {
+        FramedWrite::new(writer, self)
     }
 
     fn type_indicator(&self, datum: &Datum) -> Option<&'static str> {
@@ -115,30 +161,6 @@ pub trait TagSinkExt: AsyncWrite + Sized {
 
 impl<W> TagSinkExt for W where W: AsyncWrite {}
 
-impl TagEncoder {
-    /// Create a sink from this encoder and a writer.
-    ///
-    /// ```
-    /// use adif::{Field, Tag, TagEncoder};
-    /// use futures::SinkExt;
-    ///
-    /// # tokio_test::block_on(async {
-    /// let mut buf = Vec::new();
-    /// let mut sink = TagEncoder::new().tag_sink_with(&mut buf);
-    /// let field = Field::new("call", "W1AW");
-    /// sink.send(Tag::Field(field)).await.unwrap();
-    /// sink.close().await.unwrap();
-    /// assert_eq!(buf, b"<call:4>W1AW");
-    /// # })
-    /// ```
-    pub fn tag_sink_with<W>(self, writer: W) -> TagSink<W>
-    where
-        W: AsyncWrite,
-    {
-        FramedWrite::new(writer, self)
-    }
-}
-
 /// Sink for writing ADIF records to an async writer
 pub struct RecordSink<W> {
     inner: TagSink<W>,
@@ -172,7 +194,7 @@ where
         }
     }
 
-    /// Create a new RecordSink with specified type specifier behavior.
+    /// Create a new RecordSink with given type specifier behavior.
     pub fn with_types(writer: W, types: OutputTypes) -> Self {
         Self {
             inner: TagEncoder::with_types(types).tag_sink_with(writer),

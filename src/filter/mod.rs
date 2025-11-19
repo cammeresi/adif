@@ -102,6 +102,23 @@ impl<S> FilterExt for S where S: Stream {}
 ///
 /// Create `:time_on` and `:time_off` fields from separate date/time
 /// components.  Handle date crossing when time_off is earlier than time_on.
+///
+/// ```
+/// use adif::{Datum, Record, RecordStreamExt, TagDecoder};
+/// use adif::filter::normalize_times;
+/// use chrono::{NaiveDate, NaiveTime, Timelike};
+/// use futures::StreamExt;
+///
+/// # tokio_test::block_on(async {
+/// let data = b"<qso_date:8>20240101<time_on:6>230000<eor>";
+/// let stream = TagDecoder::new_stream(&data[..], true).records();
+/// let mut stream = normalize_times(stream);
+/// let record = stream.next().await.unwrap().unwrap();
+/// let dt = record.get(":time_on").and_then(|d| d.as_datetime()).unwrap();
+/// assert_eq!(dt.date(), NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
+/// assert_eq!(dt.time(), NaiveTime::from_hms_opt(23, 0, 0).unwrap());
+/// # });
+/// ```
 pub fn normalize_times<S>(
     stream: S,
 ) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
@@ -140,7 +157,8 @@ where
 /// Normalize mode field from multiple possible source fields.
 ///
 /// Coalesce mode from `mode`, `app_lotw_mode`, or `app_lotw_modegroup`
-/// fields, and provide special handling for MFSK submodes (FT4, Q65).
+/// fields, and promote to full modes the modes that LOTW considers submodes
+/// of MFSK (i.e. FT4, Q65).
 pub fn normalize_mode<S>(
     stream: S,
 ) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
@@ -177,6 +195,20 @@ where
 }
 
 /// Normalize band field to uppercase.
+///
+/// ```
+/// use adif::{filter::normalize_band, Record, RecordStreamExt, TagDecoder};
+/// use futures::StreamExt;
+///
+/// # tokio_test::block_on(async {
+/// let data = b"<band:3>20m<eor>";
+/// let stream = TagDecoder::new_stream(&data[..], true).records();
+/// let mut stream = normalize_band(stream);
+/// let record = stream.next().await.unwrap().unwrap();
+/// let band = record.get(":band").and_then(|b| b.as_str()).unwrap();
+/// assert_eq!(band, "20M");
+/// # });
+/// ```
 pub fn normalize_band<S>(
     stream: S,
 ) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
@@ -214,6 +246,20 @@ where
 }
 
 /// Exclude header records from the stream.
+///
+/// ```
+/// use adif::{filter::exclude_header, Record, RecordStreamExt, TagDecoder};
+/// use futures::StreamExt;
+///
+/// # tokio_test::block_on(async {
+/// let data = b"<foo:3>bar<eoh><call:5>K2XYZ<eor>";
+/// let stream = TagDecoder::new_stream(&data[..], true).records();
+/// let mut stream = exclude_header(stream);
+/// let record = stream.next().await.unwrap().unwrap();
+/// assert!(!record.is_header());
+/// assert_eq!(record.get("call").unwrap().as_str().unwrap(), "K2XYZ");
+/// # });
+/// ```
 pub fn exclude_header<S>(stream: S) -> Filter<S, impl FnMut(&Record) -> bool>
 where
     S: Stream<Item = Result<Record, Error>>,

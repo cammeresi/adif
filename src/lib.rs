@@ -80,9 +80,9 @@ impl Datum {
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Self::Boolean(b) => Some(*b),
-            Self::String(s) => match s.to_uppercase().as_str() {
-                "Y" => Some(true),
-                "N" => Some(false),
+            Self::String(s) => match s.as_str() {
+                "Y" | "y" => Some(true),
+                "N" | "n" => Some(false),
                 _ => None,
             },
             _ => None,
@@ -338,11 +338,6 @@ impl Record {
         self.fields.get(name)
     }
 
-    /// Return an iterator over all fields in this record.
-    pub fn fields(&self) -> impl Iterator<Item = (&String, &Datum)> {
-        self.fields.iter()
-    }
-
     /// Add a field to the record.
     ///
     /// Overwriting a previous value is not permitted and will return an
@@ -386,5 +381,15 @@ impl Record {
                 Ok(())
             }
         }
+    }
+
+    /// Consume the record and return an iterator over owned fields.
+    pub fn into_fields(self) -> impl Iterator<Item = (String, Datum)> {
+        self.fields.into_iter()
+    }
+
+    /// Return an iterator over all fields in this record.
+    pub fn fields(&self) -> impl Iterator<Item = (&String, &Datum)> {
+        self.fields.iter()
     }
 }

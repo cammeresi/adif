@@ -224,7 +224,13 @@ where
             return;
         };
 
-        let _ = record.insert(BAND), band.to_uppercase());
+        let band =
+            if band.chars().all(|c| c.is_uppercase() || !c.is_alphabetic()) {
+                band.to_string()
+            } else {
+                band.to_uppercase()
+            };
+        let _ = record.insert(BAND, band);
     })
 }
 

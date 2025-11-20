@@ -10,6 +10,7 @@ dependencies = [
  "chrono",
  "futures",
  "indexmap",
+ "itoa",
  "rust_decimal",
  "thiserror",
  "tokio",

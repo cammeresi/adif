@@ -130,7 +130,8 @@ impl Encoder<Tag> for TagEncoder {
                 dst.put_u8(b'<');
                 dst.put_slice(field.name().as_bytes());
                 dst.put_u8(b':');
-                dst.put_slice(value.len().to_string().as_bytes());
+                let mut buf = itoa::Buffer::new();
+                dst.put_slice(buf.format(value.len()).as_bytes());
                 if let Some(typ) = self.type_indicator(field.value()) {
                     dst.put_u8(b':');
                     dst.put_slice(typ.as_bytes());
@@ -217,12 +218,12 @@ where
     fn start_send(
         mut self: Pin<&mut Self>, item: Record,
     ) -> Result<(), Self::Error> {
-        for (name, value) in item.fields() {
-            let field = Field::new(name.clone(), value.clone());
+        let tag = if item.is_header() { Tag::Eoh } else { Tag::Eor };
+        for (name, value) in item.into_fields() {
+            let field = Field::new(name, value);
             Pin::new(&mut self.inner).start_send(Tag::Field(field))?;
         }
 
-        let tag = if item.is_header() { Tag::Eoh } else { Tag::Eor };
         Pin::new(&mut self.inner).start_send(tag)
     }
 

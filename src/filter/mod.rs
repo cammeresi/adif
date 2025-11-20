@@ -1,6 +1,6 @@
 //! Optional ADIF data transformations
 
-use crate::{Datum, Error, Record};
+use crate::{Error, Record};
 use chrono::{Days, NaiveDateTime};
 use futures::stream::Stream;
 use std::collections::HashSet;
@@ -125,6 +125,9 @@ pub fn normalize_times<S>(
 where
     S: Stream<Item = Result<Record, Error>>,
 {
+    const TIME_ON: &str = ":time_on";
+    const TIME_OFF: &str = ":time_off";
+
     stream.normalize(|record| {
         let date = record.get("qso_date").and_then(|d| d.as_date());
         let date_off = record.get("qso_date_off").and_then(|d| d.as_date());
@@ -133,7 +136,7 @@ where
 
         if let (Some(date), Some(time_on)) = (date, time_on) {
             let dt = NaiveDateTime::new(date, time_on);
-            let _ = record.insert(":time_on".to_string(), Datum::DateTime(dt));
+            let _ = record.insert(TIME_ON, dt);
 
             if let Some(time_off) = time_off {
                 let date = if let Some(date_off) = date_off {
@@ -147,8 +150,7 @@ where
                     date
                 };
                 let dt = NaiveDateTime::new(date, time_off);
-                let _ =
-                    record.insert(":time_off".to_string(), Datum::DateTime(dt));
+                let _ = record.insert(TIME_OFF, dt);
             }
         }
     })
@@ -166,6 +168,7 @@ where
     S: Stream<Item = Result<Record, Error>>,
 {
     const MFSK_SUBMODES: &[&str] = &["FT4", "Q65"];
+    const MODE: &str = ":mode";
 
     stream.normalize(|record| {
         let mode = record
@@ -189,8 +192,7 @@ where
             _ => mode,
         };
 
-        let _ =
-            record.insert(":mode".to_string(), Datum::String(mode.to_string()));
+        let _ = record.insert(MODE, mode.into_owned());
     })
 }
 
@@ -215,13 +217,14 @@ pub fn normalize_band<S>(
 where
     S: Stream<Item = Result<Record, Error>>,
 {
+    const BAND: &str = ":band";
+
     stream.normalize(|record| {
         let Some(band) = record.get("band").and_then(|b| b.as_str()) else {
             return;
         };
 
-        let _ = record
-            .insert(":band".to_string(), Datum::String(band.to_uppercase()));
+        let _ = record.insert(BAND), band.to_uppercase());
     })
 }
 

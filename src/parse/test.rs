@@ -72,8 +72,53 @@ async fn typed() {
     let mut f = tags("<foo:3:n>123");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "foo");
+    assert!(matches!(field.value(), Datum::Number(_)));
     let num = field.value().as_number().unwrap();
     assert_eq!(num, Decimal::from_str("123").unwrap());
+    no_tags(&mut f).await;
+
+    let mut f = tags("<foo:3:N>123");
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "foo");
+    assert!(matches!(field.value(), Datum::Number(_)));
+    let num = field.value().as_number().unwrap();
+    assert_eq!(num, Decimal::from_str("123").unwrap());
+    no_tags(&mut f).await;
+
+    let mut f = tags("<bar:1:b>Y");
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "bar");
+    assert!(matches!(field.value(), Datum::Boolean(true)));
+    no_tags(&mut f).await;
+
+    let mut f = tags("<bar:1:B>Y");
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "bar");
+    assert!(matches!(field.value(), Datum::Boolean(true)));
+    no_tags(&mut f).await;
+
+    let mut f = tags("<qso_date:8:d>20240101");
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "qso_date");
+    assert!(matches!(field.value(), Datum::Date(_)));
+    no_tags(&mut f).await;
+
+    let mut f = tags("<qso_date:8:D>20240101");
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "qso_date");
+    assert!(matches!(field.value(), Datum::Date(_)));
+    no_tags(&mut f).await;
+
+    let mut f = tags("<time_on:6:t>230000");
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "time_on");
+    assert!(matches!(field.value(), Datum::Time(_)));
+    no_tags(&mut f).await;
+
+    let mut f = tags("<time_on:6:T>230000");
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "time_on");
+    assert!(matches!(field.value(), Datum::Time(_)));
     no_tags(&mut f).await;
 }
 

@@ -3,6 +3,7 @@
 use crate::{Datum, Error, Field, Record, Tag};
 use bytes::{BufMut, BytesMut};
 use futures::sink::Sink;
+use std::borrow::Cow;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncWrite;
@@ -115,17 +116,16 @@ impl Encoder<Tag> for TagEncoder {
             }
             Tag::Field(field) => {
                 if matches!(field.value(), Datum::DateTime(_)) {
-                    return Err(Error::InvalidFormat(
+                    return Err(Error::InvalidFormat(Cow::Borrowed(
                         "DateTime cannot be output directly; \
-                         split into date and time fields"
-                            .to_string(),
-                    ));
+                         split into date and time fields",
+                    )));
                 }
 
-                let value = field.value().as_str().ok_or_else(|| {
-                    let e = "Cannot convert value to string".to_string();
-                    Error::InvalidFormat(e)
-                })?;
+                let value =
+                    field.value().as_str().ok_or(Error::InvalidFormat(
+                        Cow::Borrowed("Cannot convert value to string"),
+                    ))?;
 
                 dst.put_u8(b'<');
                 dst.put_slice(field.name().as_bytes());

@@ -6,6 +6,7 @@ use chrono::{NaiveDate, NaiveTime};
 use futures::stream::Stream;
 use indexmap::IndexMap;
 use rust_decimal::Decimal;
+use std::borrow::Cow;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::task::{Context, Poll};
@@ -48,7 +49,9 @@ impl TagDecoder {
     }
 
     fn invalid_tag(tag: &[u8]) -> Error {
-        Error::InvalidFormat(String::from_utf8_lossy(tag).to_string())
+        Error::InvalidFormat(Cow::Owned(
+            String::from_utf8_lossy(tag).into_owned(),
+        ))
     }
 
     fn parse_typed_value(
@@ -175,9 +178,9 @@ impl Decoder for TagDecoder {
                     src.clear();
                     Ok(None)
                 } else if !src.is_empty() {
-                    Err(Error::InvalidFormat(
-                        "partial data at end of stream".to_string(),
-                    ))
+                    Err(Error::InvalidFormat(Cow::Borrowed(
+                        "partial data at end of stream",
+                    )))
                 } else {
                     Ok(None)
                 }

@@ -39,7 +39,7 @@ pub enum Error {
     /// This includes malformed tags, invalid type specifiers, or duplicate
     /// keys in records.
     #[error("Invalid ADIF format: {0}")]
-    InvalidFormat(String),
+    InvalidFormat(Cow<'static, str>),
 }
 
 impl PartialEq for Error {
@@ -373,9 +373,9 @@ impl Record {
     {
         let name = name.into();
         match self.fields.entry(name) {
-            Entry::Occupied(e) => {
-                Err(Error::InvalidFormat(format!("duplicate key: {}", e.key())))
-            }
+            Entry::Occupied(e) => Err(Error::InvalidFormat(Cow::Owned(
+                format!("duplicate key: {}", e.key()),
+            ))),
             Entry::Vacant(e) => {
                 e.insert(value.into());
                 Ok(())

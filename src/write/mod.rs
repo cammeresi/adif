@@ -1,6 +1,6 @@
 //! Writing ADIF data to async writers
 
-use crate::{Datum, Error, Field, Record, Tag};
+use crate::{Datum, Error, Record, Tag};
 use bytes::{BufMut, BytesMut};
 use futures::sink::Sink;
 use std::borrow::Cow;
@@ -99,6 +99,42 @@ impl TagEncoder {
             (_, Datum::String(_)) => None,
         }
     }
+
+    fn encode_eoh(dst: &mut BytesMut) {
+        dst.put_slice(b"<eoh>\n");
+    }
+
+    fn encode_eor(dst: &mut BytesMut) {
+        dst.put_slice(b"<eor>\n");
+    }
+
+    fn encode_field(
+        &self, name: &str, value: &Datum, dst: &mut BytesMut,
+    ) -> Result<(), Error> {
+        if matches!(value, Datum::DateTime(_)) {
+            return Err(Error::InvalidFormat(Cow::Borrowed(
+                "DateTime cannot be output directly; \
+                 split into date and time fields",
+            )));
+        }
+
+        let s = value.as_str().ok_or(Error::InvalidFormat(Cow::Borrowed(
+            "Cannot convert value to string",
+        )))?;
+
+        dst.put_u8(b'<');
+        dst.put_slice(name.as_bytes());
+        dst.put_u8(b':');
+        let mut buf = itoa::Buffer::new();
+        dst.put_slice(buf.format(s.len()).as_bytes());
+        if let Some(typ) = self.type_indicator(value) {
+            dst.put_u8(b':');
+            dst.put_slice(typ.as_bytes());
+        }
+        dst.put_u8(b'>');
+        dst.put_slice(s.as_bytes());
+        Ok(())
+    }
 }
 
 impl Encoder<Tag> for TagEncoder {
@@ -108,36 +144,37 @@ impl Encoder<Tag> for TagEncoder {
         &mut self, item: Tag, dst: &mut BytesMut,
     ) -> Result<(), Self::Error> {
         match item {
-            Tag::Eoh => {
-                dst.put_slice(b"<eoh>\n");
-            }
-            Tag::Eor => {
-                dst.put_slice(b"<eor>\n");
-            }
+            Tag::Eoh => Self::encode_eoh(dst),
+            Tag::Eor => Self::encode_eor(dst),
             Tag::Field(field) => {
-                if matches!(field.value(), Datum::DateTime(_)) {
-                    return Err(Error::InvalidFormat(Cow::Borrowed(
-                        "DateTime cannot be output directly; \
-                         split into date and time fields",
-                    )));
-                }
+                self.encode_field(field.name(), field.value(), dst)?;
+            }
+        }
+        Ok(())
+    }
+}
 
-                let value =
-                    field.value().as_str().ok_or(Error::InvalidFormat(
-                        Cow::Borrowed("Cannot convert value to string"),
-                    ))?;
+/// Internal tag type for writing with borrowed field data
+enum WriterTag<'a> {
+    Field { name: &'a str, value: &'a Datum },
+    Eoh,
+    Eor,
+}
 
-                dst.put_u8(b'<');
-                dst.put_slice(field.name().as_bytes());
-                dst.put_u8(b':');
-                let mut buf = itoa::Buffer::new();
-                dst.put_slice(buf.format(value.len()).as_bytes());
-                if let Some(typ) = self.type_indicator(field.value()) {
-                    dst.put_u8(b':');
-                    dst.put_slice(typ.as_bytes());
-                }
-                dst.put_u8(b'>');
-                dst.put_slice(value.as_bytes());
+/// Wrapper around TagEncoder for encoding WriterTag
+struct WriterTagEncoder(TagEncoder);
+
+impl Encoder<WriterTag<'_>> for WriterTagEncoder {
+    type Error = Error;
+
+    fn encode(
+        &mut self, item: WriterTag<'_>, dst: &mut BytesMut,
+    ) -> Result<(), Self::Error> {
+        match item {
+            WriterTag::Eoh => TagEncoder::encode_eoh(dst),
+            WriterTag::Eor => TagEncoder::encode_eor(dst),
+            WriterTag::Field { name, value } => {
+                self.0.encode_field(name, value, dst)?;
             }
         }
         Ok(())
@@ -164,7 +201,7 @@ impl<W> TagSinkExt for W where W: AsyncWrite {}
 
 /// Sink for writing ADIF records to an async writer
 pub struct RecordSink<W> {
-    inner: TagSink<W>,
+    inner: FramedWrite<W, WriterTagEncoder>,
 }
 
 impl<W> RecordSink<W>
@@ -191,14 +228,20 @@ where
     /// ```
     pub fn new(writer: W) -> Self {
         Self {
-            inner: TagEncoder::new().tag_sink_with(writer),
+            inner: FramedWrite::new(
+                writer,
+                WriterTagEncoder(TagEncoder::new()),
+            ),
         }
     }
 
     /// Create a new RecordSink with given type specifier behavior.
     pub fn with_types(writer: W, types: OutputTypes) -> Self {
         Self {
-            inner: TagEncoder::with_types(types).tag_sink_with(writer),
+            inner: FramedWrite::new(
+                writer,
+                WriterTagEncoder(TagEncoder::with_types(types)),
+            ),
         }
     }
 }
@@ -218,10 +261,14 @@ where
     fn start_send(
         mut self: Pin<&mut Self>, item: Record,
     ) -> Result<(), Self::Error> {
-        let tag = if item.is_header() { Tag::Eoh } else { Tag::Eor };
-        for (name, value) in item.into_fields() {
-            let field = Field::new(name, value);
-            Pin::new(&mut self.inner).start_send(Tag::Field(field))?;
+        let tag = if item.is_header() {
+            WriterTag::Eoh
+        } else {
+            WriterTag::Eor
+        };
+        for (name, value) in item.fields() {
+            Pin::new(&mut self.inner)
+                .start_send(WriterTag::Field { name, value })?;
         }
 
         Pin::new(&mut self.inner).start_send(tag)

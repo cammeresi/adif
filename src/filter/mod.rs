@@ -144,7 +144,7 @@ where
                 } else if time_off < time_on {
                     match date.checked_add_days(Days::new(1)) {
                         Some(d) => d,
-                        None => return,
+                        None => return, // can't overflow
                     }
                 } else {
                     date

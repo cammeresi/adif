@@ -4,8 +4,8 @@ use chrono::{NaiveDate, NaiveTime};
 use futures::{SinkExt, StreamExt};
 use rust_decimal::Decimal;
 
-use super::*;
-use crate::{Datum, Field, Record, RecordStream, Tag};
+use super::{RecordSink, TagEncoder, TagSinkExt};
+use crate::{Datum, Field, OutputTypes, Record, RecordStream, Tag};
 
 async fn encode_tag(tag: Tag, types: OutputTypes) -> Vec<u8> {
     let mut buf = Vec::new();
@@ -20,16 +20,12 @@ async fn encode_field(
 ) {
     let field = Field::new("f", value);
     let out = encode_tag(Tag::Field(field.clone()), OutputTypes::Always).await;
-    assert_eq!(out.as_slice(), always.as_bytes(), "failed on Always");
+    assert_eq!(out.as_slice(), always.as_bytes());
     let out =
         encode_tag(Tag::Field(field.clone()), OutputTypes::OnlyNonString).await;
-    assert_eq!(
-        out.as_slice(),
-        only_non_string.as_bytes(),
-        "failed on OnlyNonString"
-    );
+    assert_eq!(out.as_slice(), only_non_string.as_bytes());
     let out = encode_tag(Tag::Field(field), OutputTypes::Never).await;
-    assert_eq!(out.as_slice(), never.as_bytes(), "failed on Never");
+    assert_eq!(out.as_slice(), never.as_bytes());
 }
 
 async fn encode_record(record: Record, types: OutputTypes) -> Vec<u8> {
@@ -194,4 +190,53 @@ async fn record_roundtrip() {
         Decimal::from_str("7.074").unwrap()
     );
     assert_eq!(parsed, record);
+}
+
+#[tokio::test]
+async fn encode_record_with_all_types() {
+    let mut record = Record::new();
+    record.insert("call", "W1AW").unwrap();
+    record.insert("qsl", true).unwrap();
+    record
+        .insert("freq", Decimal::from_str("14.074").unwrap())
+        .unwrap();
+    record
+        .insert("qso_date", NaiveDate::from_ymd_opt(2024, 1, 15).unwrap())
+        .unwrap();
+    record
+        .insert("time_on", NaiveTime::from_hms_opt(14, 30, 0).unwrap())
+        .unwrap();
+
+    let mut buf = Vec::new();
+    let mut sink = RecordSink::new(&mut buf);
+    sink.send(record).await.unwrap();
+    sink.close().await.unwrap();
+
+    let output = String::from_utf8(buf).unwrap();
+    assert_eq!(
+        output,
+        "<call:4>W1AW<qsl:1>Y<freq:6>14.074<qso_date:8>20240115<time_on:6>143000<eor>\n"
+    );
+}
+
+#[tokio::test]
+async fn tag_sink() {
+    let mut buf = Vec::new();
+    let mut sink = (&mut buf).tag_sink();
+    let field = Field::new("call", "W1AW");
+    sink.send(Tag::Field(field)).await.unwrap();
+    sink.close().await.unwrap();
+
+    assert_eq!(buf, b"<call:4>W1AW");
+}
+
+#[tokio::test]
+async fn tag_sink_with_types() {
+    let mut buf = Vec::new();
+    let mut sink = (&mut buf).tag_sink_with_types(OutputTypes::Always);
+    let field = Field::new("call", "W1AW");
+    sink.send(Tag::Field(field)).await.unwrap();
+    sink.close().await.unwrap();
+
+    assert_eq!(buf, b"<call:4:s>W1AW");
 }

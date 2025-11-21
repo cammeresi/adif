@@ -2,6 +2,7 @@ use super::*;
 use crate::parse::{RecordStream, TagStream};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use futures::StreamExt;
+use std::borrow::Cow;
 
 fn dt(
     year: i32, month: u32, day: u32, hour: u32, min: u32, sec: u32,
@@ -51,10 +52,10 @@ async fn duplicate_key_error() {
     let mut record = next(&mut normalized).await;
 
     let err = record.insert(":time_on", "test").unwrap_err();
-    match err {
-        Error::InvalidFormat(s) => assert_eq!(s, "duplicate key: :time_on"),
-        _ => panic!("expected InvalidFormat error"),
-    }
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Borrowed("duplicate key: :time_on")),
+    );
 }
 
 #[tokio::test]
@@ -323,5 +324,49 @@ async fn exclude_header_no_header() {
     assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
     let rec = next(&mut filtered).await;
     assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert!(filtered.next().await.is_none());
+}
+
+#[tokio::test]
+async fn normalize_error_passthrough() {
+    let stream = RecordStream::new("<call:4>W1AW<eor><bad".as_bytes(), false);
+    let mut normalized = stream.normalize(|_record| {});
+    let rec = next(&mut normalized).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    let err = normalized.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Borrowed("partial data at end of stream"))
+    );
+}
+
+#[tokio::test]
+async fn filter_error_passthrough() {
+    let stream = RecordStream::new("<call:4>W1AW<eor><bad".as_bytes(), false);
+    let mut filtered = FilterExt::filter(stream, |_record| true);
+    let rec = next(&mut filtered).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    let err = filtered.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Borrowed("partial data at end of stream"))
+    );
+}
+
+#[tokio::test]
+async fn normalize_end_of_stream() {
+    let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
+    let mut normalized = stream.normalize(|_record| {});
+    let rec = next(&mut normalized).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert!(normalized.next().await.is_none());
+}
+
+#[tokio::test]
+async fn filter_end_of_stream() {
+    let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
+    let mut filtered = FilterExt::filter(stream, |_record| true);
+    let rec = next(&mut filtered).await;
+    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
     assert!(filtered.next().await.is_none());
 }

@@ -87,16 +87,23 @@ impl TagEncoder {
         FramedWrite::new(writer, self)
     }
 
-    fn type_indicator(&self, datum: &Datum) -> Option<&'static str> {
+    fn type_indicator(
+        &self, datum: &Datum,
+    ) -> Result<Option<&'static str>, Error> {
         match (self.types, datum) {
-            (OutputTypes::Never, _) => None,
-            (_, Datum::Boolean(_)) => Some("b"),
-            (_, Datum::Number(_)) => Some("n"),
-            (_, Datum::Date(_)) => Some("d"),
-            (_, Datum::Time(_)) => Some("t"),
-            (_, Datum::DateTime(_)) => None, // shouldn't happen
-            (OutputTypes::Always, Datum::String(_)) => Some("s"),
-            (_, Datum::String(_)) => None,
+            (_, Datum::DateTime(_)) => {
+                Err(Error::InvalidFormat(Cow::Borrowed(
+                    "DateTime cannot be output directly; split into date \
+                     and time fields",
+                )))
+            }
+            (OutputTypes::Never, _) => Ok(None),
+            (_, Datum::Boolean(_)) => Ok(Some("b")),
+            (_, Datum::Number(_)) => Ok(Some("n")),
+            (_, Datum::Date(_)) => Ok(Some("d")),
+            (_, Datum::Time(_)) => Ok(Some("t")),
+            (OutputTypes::Always, Datum::String(_)) => Ok(Some("s")),
+            (_, Datum::String(_)) => Ok(None),
         }
     }
 
@@ -111,13 +118,6 @@ impl TagEncoder {
     fn encode_field(
         &self, name: &str, value: &Datum, dst: &mut BytesMut,
     ) -> Result<(), Error> {
-        if matches!(value, Datum::DateTime(_)) {
-            return Err(Error::InvalidFormat(Cow::Borrowed(
-                "DateTime cannot be output directly; \
-                 split into date and time fields",
-            )));
-        }
-
         let s = value.as_str().ok_or(Error::InvalidFormat(Cow::Borrowed(
             "Cannot convert value to string",
         )))?;
@@ -127,7 +127,7 @@ impl TagEncoder {
         dst.put_u8(b':');
         let mut buf = itoa::Buffer::new();
         dst.put_slice(buf.format(s.len()).as_bytes());
-        if let Some(typ) = self.type_indicator(value) {
+        if let Some(typ) = self.type_indicator(value)? {
             dst.put_u8(b':');
             dst.put_slice(typ.as_bytes());
         }

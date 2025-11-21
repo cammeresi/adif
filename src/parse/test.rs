@@ -57,6 +57,34 @@ where
 }
 
 #[tokio::test]
+#[should_panic(expected = "expected field")]
+async fn next_field_panics_on_eoh() {
+    let mut f = tags("<eoh>");
+    next_field(&mut f).await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "expected field")]
+async fn next_field_panics_on_eor() {
+    let mut f = tags("<eor>");
+    next_field(&mut f).await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "expected eoh")]
+async fn next_eoh_panics_on_field() {
+    let mut f = tags("<call:4>W1AW");
+    next_eoh(&mut f).await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "expected eoh")]
+async fn next_eoh_panics_on_eor() {
+    let mut f = tags("<eor>");
+    next_eoh(&mut f).await;
+}
+
+#[tokio::test]
 async fn header() {
     let mut f = tags("Foo Bar Baz <adifver:5>3.1.1 <eoh>");
 
@@ -178,11 +206,22 @@ async fn partial_tag_error() {
     for i in 0..s.len() {
         let mut f = TagDecoder::new_stream(&s.as_bytes()[..=i], false);
         let err = f.next().await.unwrap().unwrap_err();
-        match err {
-            Error::InvalidFormat(_) => {}
-            _ => panic!("expected InvalidFormat error"),
-        }
+        assert_eq!(
+            err,
+            Error::InvalidFormat(Cow::Borrowed(
+                "partial data at end of stream"
+            ))
+        );
     }
+}
+
+#[tokio::test]
+async fn complete_tag_no_error() {
+    let mut f = TagDecoder::new_stream("<foo:3>bar".as_bytes(), false);
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "foo");
+    assert_eq!(field.value().as_str().unwrap(), "bar");
+    no_tags(&mut f).await;
 }
 
 struct TrickleReader {
@@ -285,10 +324,10 @@ async fn partial_record_ignore() {
 async fn partial_record_error() {
     let mut f = RecordStream::new("<call:4>W1A".as_bytes(), false);
     let err = f.next().await.unwrap().unwrap_err();
-    match err {
-        Error::InvalidFormat(_) => {}
-        _ => panic!("expected InvalidFormat error"),
-    }
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Borrowed("partial data at end of stream"))
+    );
 }
 
 #[tokio::test]
@@ -414,10 +453,7 @@ async fn boolean_n() {
 async fn boolean_invalid() {
     let mut f = RecordStream::new("<qsl:1:b>X<eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    match err {
-        Error::InvalidFormat(_) => {}
-        _ => panic!("expected InvalidFormat error"),
-    }
+    assert_eq!(err, Error::InvalidFormat(Cow::Owned("qsl:1:b".to_string())));
 }
 
 #[tokio::test]
@@ -526,4 +562,34 @@ async fn non_ascii_value() {
     let mut f = RecordStream::new("<name:6>André<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     assert_eq!(rec.get("name").unwrap().as_str().unwrap(), "André");
+}
+
+#[tokio::test]
+async fn invalid_utf8_in_field_value() {
+    let bytes = b"<foo:2>\xFF\xFE<eor>";
+    let mut f = RecordStream::new(bytes as &[u8], true);
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(err, Error::InvalidFormat(Cow::Owned("foo:2".to_string())));
+}
+
+#[tokio::test]
+async fn invalid_utf8_in_tag_name() {
+    let bytes = b"<\xFF\xFE:3>val<eor>";
+    let mut f = RecordStream::new(bytes as &[u8], true);
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Owned("\u{FFFD}\u{FFFD}:3".to_string()))
+    );
+}
+
+#[tokio::test]
+async fn invalid_utf8_in_type_spec() {
+    let bytes = b"<foo:3:\xFF>val<eor>";
+    let mut f = RecordStream::new(bytes as &[u8], true);
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Owned("foo:3:\u{FFFD}".to_string()))
+    );
 }

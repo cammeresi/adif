@@ -55,16 +55,16 @@ impl TagDecoder {
     }
 
     fn parse_typed_value(
-        typ: Option<&str>, s: &str, tag: &[u8],
+        tag: &[u8], v: &str, typ: Option<&str>,
     ) -> Result<Datum, Error> {
         match typ {
             Some("n") | Some("N") => {
                 let num =
-                    Decimal::from_str(s).map_err(|_| Self::invalid_tag(tag))?;
+                    Decimal::from_str(v).map_err(|_| Self::invalid_tag(tag))?;
                 Ok(Datum::Number(num))
             }
             Some("b") | Some("B") => {
-                let b = match s {
+                let b = match v {
                     "Y" | "y" => true,
                     "N" | "n" => false,
                     _ => return Err(Self::invalid_tag(tag)),
@@ -72,54 +72,48 @@ impl TagDecoder {
                 Ok(Datum::Boolean(b))
             }
             Some("d") | Some("D") => {
-                let date = NaiveDate::parse_from_str(s, "%Y%m%d")
+                let date = NaiveDate::parse_from_str(v, "%Y%m%d")
                     .map_err(|_| Self::invalid_tag(tag))?;
                 Ok(Datum::Date(date))
             }
             Some("t") | Some("T") => {
-                let time = NaiveTime::parse_from_str(s, "%H%M%S")
+                let time = NaiveTime::parse_from_str(v, "%H%M%S")
                     .map_err(|_| Self::invalid_tag(tag))?;
                 Ok(Datum::Time(time))
             }
-            _ => Ok(Datum::String(s.to_string())),
+            _ => Ok(Datum::String(v.to_string())),
         }
     }
 
+    fn as_str<'a>(data: &'a [u8], tag: &[u8]) -> Result<&'a str, Error> {
+        str::from_utf8(data).map_err(|_| Self::invalid_tag(tag))
+    }
+
     fn parse_value(
-        tag: &[u8], end: usize, src: &BytesMut,
+        src: &BytesMut, offset: usize, tag: &[u8],
     ) -> Result<Option<(String, Datum, usize)>, Error> {
         let err = || Self::invalid_tag(tag);
 
         let mut parts = tag.split(|&b| b == b':');
         let (name, len, typ) =
             match (parts.next(), parts.next(), parts.next(), parts.next()) {
-                (Some(name), Some(len), None, None) => (name, len, None),
-                (Some(name), Some(len), Some(typ), None) => {
-                    (name, len, Some(typ))
-                }
+                (Some(name), Some(len), typ, None) => (name, len, typ),
                 _ => return Err(err()),
             };
 
-        let name = str::from_utf8(name)
-            .map_err(|_| err())?
-            .to_ascii_lowercase();
-        let len = str::from_utf8(len).map_err(|_| err())?;
+        let name = Self::as_str(name, tag)?.to_ascii_lowercase();
+        let len = Self::as_str(len, tag)?;
         let len = len.parse::<usize>().map_err(|_| err())?;
-        let typ = typ
-            .map(|t| str::from_utf8(t))
-            .transpose()
-            .map_err(|_| err())?;
+        let typ = typ.map(|t| Self::as_str(t, tag)).transpose()?;
 
-        let (begin, end) = (end + 1, end + 1 + len);
+        let (begin, end) = (offset + 1, offset + 1 + len);
         if end > src.len() {
             return Ok(None);
         }
 
-        let Some(s) = src.get(begin..end) else {
-            return Ok(None); // shouldn't happen
-        };
-        let s = str::from_utf8(s).map_err(|_| err())?;
-        let value = Self::parse_typed_value(typ, s, tag)?;
+        let value = &src[begin..end];
+        let value = Self::as_str(value, tag)?;
+        let value = Self::parse_typed_value(tag, value, typ)?;
 
         Ok(Some((name, value, end)))
     }
@@ -136,18 +130,13 @@ impl Decoder for TagDecoder {
             src.clear();
             return Ok(None);
         };
-
-        let Some(remainder) = src.get(begin..) else {
-            return Ok(None); // shouldn't happen
-        };
+        let remainder = &src[begin..];
         let Some(end) = remainder.iter().position(|&b| b == b'>') else {
-            return Ok(None); // shouldn't happen
+            return Ok(None);
         };
 
         let (begin, end) = (begin + 1, begin + end);
-        let Some(tag) = src.get(begin..end) else {
-            return Ok(None); // shouldn't happen
-        };
+        let tag = &src[begin..end];
 
         if tag.eq_ignore_ascii_case(b"eoh") {
             src.advance(end + 1);
@@ -160,7 +149,7 @@ impl Decoder for TagDecoder {
             return Ok(None);
         }
 
-        let Some((name, value, end)) = Self::parse_value(tag, end, src)? else {
+        let Some((name, value, end)) = Self::parse_value(src, end, tag)? else {
             return Ok(None);
         };
         src.advance(end);

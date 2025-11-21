@@ -1,5 +1,8 @@
 # ADIF Parsing for Rust
 
+[![CI](https://github.com/cammeresi/adif/workflows/Rust/badge.svg)](https://github.com/cammeresi/adif/actions)
+[![codecov](https://codecov.io/gh/cammeresi/adif/branch/master/graph/badge.svg)](https://codecov.io/gh/cammeresi/adif)
+
 ## Overview
 
 This crate parses [Amateur Data Interchange Format][adif] (ADIF) data using

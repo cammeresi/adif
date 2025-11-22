@@ -16,10 +16,33 @@ parse ADIF data in Rust on top of tokio.
 
 ## Usage
 
+Add the dependency:
+
 ```sh
 cargo add TBD
 ```
 
+Then start reading ADIF from any object that implements the AsyncRead trait:
+
+```rust,no_run
+use adif::RecordStream;
+use futures::StreamExt;
+use tokio::{fs::File, io::BufReader};
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let file = File::open("foo.adif").await?;
+    let reader = BufReader::new(file);
+    let mut stream = RecordStream::new(reader, true);
+    while let Some(result) = stream.next().await {
+        let record = result?;
+        if let Some(call) = record.get("call") {
+            println!("call: {}", call.as_str());
+        }
+    }
+    Ok(())
+}
+```
 See examples or documentation for further information.
 
 ## Features

@@ -15,6 +15,13 @@ use tokio_util::codec::{Decoder, FramedRead};
 #[cfg(test)]
 mod test;
 
+enum ParserTag {
+    Field(Field),
+    Eoh,
+    Eor,
+    Eof,
+}
+
 /// Stream of ADIF tags from an async reader.
 pub type TagStream<R> = FramedRead<R, TagDecoder>;
 
@@ -117,15 +124,10 @@ impl TagDecoder {
 
         Ok(Some((name, value, end)))
     }
-}
 
-impl Decoder for TagDecoder {
-    type Item = Tag;
-    type Error = Error;
-
-    fn decode(
+    fn decode_inner(
         &mut self, src: &mut BytesMut,
-    ) -> Result<Option<Self::Item>, Self::Error> {
+    ) -> Result<Option<ParserTag>, Error> {
         let Some(begin) = src.iter().position(|&b| b == b'<') else {
             src.clear();
             return Ok(None);
@@ -140,42 +142,67 @@ impl Decoder for TagDecoder {
 
         if tag.eq_ignore_ascii_case(b"eoh") {
             src.advance(end + 1);
-            return Ok(Some(Tag::Eoh));
+            return Ok(Some(ParserTag::Eoh));
         } else if tag.eq_ignore_ascii_case(b"eor") {
             src.advance(end + 1);
-            return Ok(Some(Tag::Eor));
+            return Ok(Some(ParserTag::Eor));
         } else if tag.eq_ignore_ascii_case(b"app_lotw_eof") {
             src.clear();
-            return Ok(None);
+            return Ok(Some(ParserTag::Eof));
         }
 
         let Some((name, value, end)) = Self::parse_value(src, end, tag)? else {
             return Ok(None);
         };
-        let tag = Tag::Field(Field::new(name, value));
+        let tag = ParserTag::Field(Field::new(name, value));
         src.advance(end);
 
         Ok(Some(tag))
     }
 
+    fn decode(
+        &mut self, src: &mut BytesMut, eof: bool,
+    ) -> Result<Option<Tag>, Error> {
+        let res = self.decode_inner(src)?;
+        let tag = match (res, eof, src.is_empty()) {
+            (Some(tag), _, _) => tag, // return tag we got
+            (None, false, _) => return Ok(None), // await more data
+            (None, true, true) => return Ok(None), // at eof, nothing left
+            (None, true, false) => {
+                // at eof and eof handling was requested
+                return Err(Error::InvalidFormat(Cow::Borrowed(
+                    "partial data at end of stream",
+                )));
+            }
+        };
+        let tag = match tag {
+            ParserTag::Field(field) => Some(Tag::Field(field)),
+            ParserTag::Eoh => Some(Tag::Eoh),
+            ParserTag::Eor => Some(Tag::Eor),
+            ParserTag::Eof => {
+                // ignore rest regardless of eof handling mode
+                src.clear();
+                None
+            }
+        };
+        Ok(tag)
+    }
+}
+
+impl Decoder for TagDecoder {
+    type Item = Tag;
+    type Error = Error;
+
+    fn decode(
+        &mut self, src: &mut BytesMut,
+    ) -> Result<Option<Self::Item>, Self::Error> {
+        self.decode(src, false)
+    }
+
     fn decode_eof(
         &mut self, src: &mut BytesMut,
     ) -> Result<Option<Self::Item>, Self::Error> {
-        match self.decode(src)? {
-            Some(item) => Ok(Some(item)),
-            None => {
-                if self.ignore_partial {
-                    src.clear();
-                    Ok(None)
-                } else if !src.is_empty() {
-                    Err(Error::InvalidFormat(Cow::Borrowed(
-                        "partial data at end of stream",
-                    )))
-                } else {
-                    Ok(None)
-                }
-            }
-        }
+        self.decode(src, !self.ignore_partial)
     }
 }
 

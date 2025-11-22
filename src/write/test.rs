@@ -7,6 +7,26 @@ use rust_decimal::Decimal;
 use super::{RecordSink, TagEncoder, TagSinkExt};
 use crate::{Datum, Field, OutputTypes, Record, RecordStream, Tag};
 
+#[tokio::test]
+async fn tag_sink() {
+    let mut buf = Vec::new();
+    let mut sink = (&mut buf).tag_sink();
+    let field = Field::new("call", "W1AW");
+    sink.send(Tag::Field(field)).await.unwrap();
+    sink.close().await.unwrap();
+    assert_eq!(buf, b"<call:4>W1AW");
+}
+
+#[tokio::test]
+async fn tag_sink_with_types() {
+    let mut buf = Vec::new();
+    let mut sink = (&mut buf).tag_sink_with_types(OutputTypes::Always);
+    let field = Field::new("call", "W1AW");
+    sink.send(Tag::Field(field)).await.unwrap();
+    sink.close().await.unwrap();
+    assert_eq!(buf, b"<call:4:s>W1AW");
+}
+
 async fn encode_tag(tag: Tag, types: OutputTypes) -> Vec<u8> {
     let mut buf = Vec::new();
     let mut sink = TagEncoder::with_types(types).tag_sink_with(&mut buf);
@@ -103,6 +123,21 @@ async fn datetime_errors() {
     );
     let mut buf = Vec::new();
     let mut sink = TagEncoder::new().tag_sink_with(&mut buf);
+    let result = sink.send(Tag::Field(field)).await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn encode_datetime_field_fails() {
+    let dt = NaiveDate::from_ymd_opt(2024, 1, 15)
+        .unwrap()
+        .and_hms_opt(14, 30, 45)
+        .unwrap();
+    let field = Field::new("qso_datetime", dt);
+
+    let mut buf = Vec::new();
+    let mut sink =
+        TagEncoder::with_types(OutputTypes::Always).tag_sink_with(&mut buf);
     let result = sink.send(Tag::Field(field)).await;
     assert!(result.is_err());
 }
@@ -220,23 +255,17 @@ async fn encode_record_with_all_types() {
 }
 
 #[tokio::test]
-async fn tag_sink() {
+async fn encode_datetime_record_fails() {
+    let dt = NaiveDate::from_ymd_opt(2024, 1, 15)
+        .unwrap()
+        .and_hms_opt(14, 30, 45)
+        .unwrap();
+    let mut record = Record::new();
+    record.insert("call", "W1AW").unwrap();
+    record.insert("qso_datetime", dt).unwrap();
+
     let mut buf = Vec::new();
-    let mut sink = (&mut buf).tag_sink();
-    let field = Field::new("call", "W1AW");
-    sink.send(Tag::Field(field)).await.unwrap();
-    sink.close().await.unwrap();
-
-    assert_eq!(buf, b"<call:4>W1AW");
-}
-
-#[tokio::test]
-async fn tag_sink_with_types() {
-    let mut buf = Vec::new();
-    let mut sink = (&mut buf).tag_sink_with_types(OutputTypes::Always);
-    let field = Field::new("call", "W1AW");
-    sink.send(Tag::Field(field)).await.unwrap();
-    sink.close().await.unwrap();
-
-    assert_eq!(buf, b"<call:4:s>W1AW");
+    let mut sink = RecordSink::with_types(&mut buf, OutputTypes::Always);
+    let result = sink.send(record).await;
+    assert!(result.is_err());
 }

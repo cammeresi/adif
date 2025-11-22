@@ -622,6 +622,17 @@ async fn invalid_utf8_in_tag_name() {
 }
 
 #[tokio::test]
+async fn invalid_utf8_in_tag_len() {
+    let bytes = b"<foo:\xFF>val<eor>";
+    let mut f = RecordStream::new(bytes as &[u8], true);
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Owned("foo:\u{FFFD}".to_string()))
+    );
+}
+
+#[tokio::test]
 async fn invalid_utf8_in_type_spec() {
     let bytes = b"<foo:3:\xFF>val<eor>";
     let mut f = RecordStream::new(bytes as &[u8], true);
@@ -629,5 +640,16 @@ async fn invalid_utf8_in_type_spec() {
     assert_eq!(
         err,
         Error::InvalidFormat(Cow::Owned("foo:3:\u{FFFD}".to_string()))
+    );
+}
+
+#[tokio::test]
+async fn duplicate_field() {
+    let mut f =
+        RecordStream::new("<call:4>W1AW<call:5>AB9BH<eor>".as_bytes(), true);
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Owned("duplicate key: call".to_string()))
     );
 }

@@ -100,53 +100,67 @@ async fn typed() {
     let mut f = tags("<foo:3:n>123");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "foo");
-    assert!(matches!(field.value(), Datum::Number(_)));
-    let num = field.value().as_number().unwrap();
-    assert_eq!(num, Decimal::from_str("123").unwrap());
+    assert_eq!(
+        field.value(),
+        &Datum::Number(Decimal::from_str("123").unwrap())
+    );
     no_tags(&mut f).await;
 
     let mut f = tags("<foo:3:N>123");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "foo");
-    assert!(matches!(field.value(), Datum::Number(_)));
-    let num = field.value().as_number().unwrap();
-    assert_eq!(num, Decimal::from_str("123").unwrap());
+    assert_eq!(
+        field.value(),
+        &Datum::Number(Decimal::from_str("123").unwrap())
+    );
     no_tags(&mut f).await;
 
     let mut f = tags("<bar:1:b>Y");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "bar");
-    assert!(matches!(field.value(), Datum::Boolean(true)));
+    assert_eq!(field.value(), &Datum::Boolean(true));
     no_tags(&mut f).await;
 
     let mut f = tags("<bar:1:B>Y");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "bar");
-    assert!(matches!(field.value(), Datum::Boolean(true)));
+    assert_eq!(field.value(), &Datum::Boolean(true));
     no_tags(&mut f).await;
 
     let mut f = tags("<qso_date:8:d>20240101");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "qso_date");
-    assert!(matches!(field.value(), Datum::Date(_)));
+    assert_eq!(
+        field.value(),
+        &Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap())
+    );
     no_tags(&mut f).await;
 
     let mut f = tags("<qso_date:8:D>20240101");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "qso_date");
-    assert!(matches!(field.value(), Datum::Date(_)));
+    assert_eq!(
+        field.value(),
+        &Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap())
+    );
     no_tags(&mut f).await;
 
     let mut f = tags("<time_on:6:t>230000");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "time_on");
-    assert!(matches!(field.value(), Datum::Time(_)));
+    assert_eq!(
+        field.value(),
+        &Datum::Time(NaiveTime::from_hms_opt(23, 0, 0).unwrap())
+    );
     no_tags(&mut f).await;
 
     let mut f = tags("<time_on:6:T>230000");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "time_on");
-    assert!(matches!(field.value(), Datum::Time(_)));
+    assert_eq!(
+        field.value(),
+        &Datum::Time(NaiveTime::from_hms_opt(23, 0, 0).unwrap())
+    );
     no_tags(&mut f).await;
 }
 
@@ -351,20 +365,14 @@ async fn record_stream() {
 async fn no_length() {
     let mut f = RecordStream::new("<call>W1AW<eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    match err {
-        Error::InvalidFormat(s) => assert_eq!(s, "call"),
-        _ => panic!("expected InvalidFormat error"),
-    }
+    assert_eq!(err, Error::InvalidFormat(Cow::Borrowed("call")));
 }
 
 #[tokio::test]
 async fn too_many() {
     let mut f = RecordStream::new("<call:4:s:xxx>W1AW<eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    match err {
-        Error::InvalidFormat(s) => assert_eq!(s, "call:4:s:xxx"),
-        _ => panic!("expected InvalidFormat error"),
-    }
+    assert_eq!(err, Error::InvalidFormat(Cow::Borrowed("call:4:s:xxx")));
 }
 
 #[tokio::test]
@@ -576,20 +584,14 @@ async fn empty_field() {
 async fn field_missing_length() {
     let mut f = RecordStream::new("<call:><eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    match err {
-        Error::InvalidFormat(s) => assert_eq!(s, "call:"),
-        _ => panic!("expected InvalidFormat error"),
-    }
+    assert_eq!(err, Error::InvalidFormat(Cow::Borrowed("call:")));
 }
 
 #[tokio::test]
 async fn field_negative_length() {
     let mut f = RecordStream::new("<call:-1><eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    match err {
-        Error::InvalidFormat(s) => assert_eq!(s, "call:-1"),
-        _ => panic!("expected InvalidFormat error"),
-    }
+    assert_eq!(err, Error::InvalidFormat(Cow::Borrowed("call:-1")));
 }
 
 #[tokio::test]

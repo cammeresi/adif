@@ -167,7 +167,7 @@ async fn record_field_order() {
     for (f1, f2) in fields1.iter().zip(fields2.iter()) {
         let name1 = f1.split(':').next().unwrap();
         let name2 = f2.split(':').next().unwrap();
-        assert_eq!(name1, name2, "field order mismatch");
+        assert_eq!(name1, name2);
     }
 }
 

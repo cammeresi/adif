@@ -1,7 +1,6 @@
 use std::borrow::Borrow;
 use std::fmt::{Display, Formatter, Result};
 use std::hash::{Hash, Hasher};
-use std::ops::Deref;
 
 /// A case-insensitive string that preserves the original case.
 ///
@@ -36,18 +35,6 @@ impl From<&str> for CiString {
     }
 }
 
-impl AsRef<str> for CiString {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Display for CiString {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        self.0.fmt(f)
-    }
-}
-
 impl PartialEq for CiString {
     fn eq(&self, other: &Self) -> bool {
         self.0.eq_ignore_ascii_case(&other.0)
@@ -79,6 +66,18 @@ impl Borrow<CiStr> for CiString {
     }
 }
 
+impl AsRef<str> for CiString {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Display for CiString {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        self.0.fmt(f)
+    }
+}
+
 /// A case-insensitive borrowed string slice.
 ///
 /// This is the borrowed equivalent of [`CiString`], allowing zero-cost
@@ -92,20 +91,6 @@ impl CiStr {
     pub fn new(s: &str) -> &Self {
         // SAFETY: CiStr is repr(transparent) over str
         unsafe { &*(s as *const str as *const CiStr) }
-    }
-}
-
-impl Deref for CiStr {
-    type Target = str;
-
-    fn deref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for CiStr {
-    fn as_ref(&self) -> &str {
-        &self.0
     }
 }
 
@@ -125,6 +110,24 @@ impl Hash for CiStr {
         for b in self.0.bytes() {
             b.to_ascii_lowercase().hash(state);
         }
+    }
+}
+
+impl Borrow<str> for CiStr {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for CiStr {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Display for CiStr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        self.0.fmt(f)
     }
 }
 
@@ -230,15 +233,15 @@ mod tests {
 
     #[test]
     fn cistr_borrow() {
-        let s = CiString::from("Hello".to_string());
-        let borrowed: &CiStr = s.borrow();
-        assert_eq!(borrowed.as_ref(), "Hello");
+        let s = CiStr::new("Hello");
+        assert_eq!(s.as_ref(), "Hello");
+        let b: &str = s.borrow();
+        assert_eq!(b, "Hello");
     }
 
     #[test]
-    fn cistr_deref() {
-        let s = CiStr::new("abc");
-        let s: &str = s.borrow();
-        assert_eq!(s, "abc");
+    fn cistr_display() {
+        let s = CiStr::new("HeLLo");
+        assert_eq!(format!("{}", s), "HeLLo");
     }
 }

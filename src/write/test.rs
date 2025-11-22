@@ -184,7 +184,7 @@ async fn record_roundtrip() {
     let mut stream = RecordStream::new(&buf[..], true);
     let parsed = stream.next().await.unwrap().unwrap();
 
-    assert_eq!(parsed.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert_eq!(parsed.get("call").unwrap().as_str(), "AB9BH");
     assert_eq!(
         parsed.get("freq").unwrap().as_number().unwrap(),
         Decimal::from_str("7.074").unwrap()

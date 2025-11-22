@@ -38,7 +38,7 @@ impl TagDecoder {
     /// let tag = t.next().await.unwrap().unwrap();
     /// let field = tag.as_field().unwrap();
     /// assert_eq!(field.name(), "foo");
-    /// assert_eq!(field.value().as_str().unwrap(), "123");
+    /// assert_eq!(field.value().as_str(), "123");
     /// # });
     /// ```
     pub fn new_stream<R>(reader: R, ignore_partial: bool) -> TagStream<R>

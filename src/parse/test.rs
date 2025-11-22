@@ -90,7 +90,7 @@ async fn header() {
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "adifver");
-    assert_eq!(field.value().as_str().unwrap(), "3.1.1");
+    assert_eq!(field.value().as_str(), "3.1.1");
     next_eoh(&mut f).await;
     no_tags(&mut f).await;
 }
@@ -220,7 +220,7 @@ async fn complete_tag_no_error() {
     let mut f = TagDecoder::new_stream("<foo:3>bar".as_bytes(), false);
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "foo");
-    assert_eq!(field.value().as_str().unwrap(), "bar");
+    assert_eq!(field.value().as_str(), "bar");
     no_tags(&mut f).await;
 }
 
@@ -264,7 +264,7 @@ async fn try_trickle(chunk: usize) {
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "bar");
-    assert_eq!(field.value().as_str().unwrap(), "baz");
+    assert_eq!(field.value().as_str(), "baz");
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "qux");
@@ -290,12 +290,12 @@ async fn records() {
         tags("<adifver:5>3.1.4 <eoh><call:4>W1AW<eor><call:5>AB9BH<eor>")
             .records();
     let rec = next_record(&mut f, true).await;
-    assert_eq!(rec.get("adifver").unwrap().as_str().unwrap(), "3.1.4");
+    assert_eq!(rec.get("adifver").unwrap().as_str(), "3.1.4");
 
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert_eq!(rec.get("call").unwrap().as_str(), "AB9BH");
     no_records(&mut f).await;
 }
 
@@ -303,17 +303,17 @@ async fn records() {
 async fn partial_record_ignore() {
     let mut f = tags("<call:4>W1AW<eor><call:5>AB9BH").records();
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     no_records(&mut f).await;
 
     let mut f = tags("<call:4>W1AW<eor><call:5>AB9B").records();
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     no_records(&mut f).await;
 
     let mut f = tags("<call:4>W1AW<eor>\n   ").records();
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     no_records(&mut f).await;
 
     let mut f = tags("<call:4>W1A").records();
@@ -334,7 +334,7 @@ async fn partial_record_error() {
 async fn record_stream() {
     let mut f = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     no_records(&mut f).await;
 }
 
@@ -450,52 +450,79 @@ async fn boolean_n() {
 }
 
 #[tokio::test]
-async fn boolean_invalid() {
+async fn invalid_boolean() {
     let mut f = RecordStream::new("<qsl:1:b>X<eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
     assert_eq!(err, Error::InvalidFormat(Cow::Owned("qsl:1:b".to_string())));
 }
 
 #[tokio::test]
+async fn invalid_number() {
+    let mut f = tags("<foo:3:n>abc");
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(err, Error::InvalidFormat(Cow::Owned("foo:3:n".to_string())));
+}
+
+#[tokio::test]
+async fn invalid_date() {
+    let mut f = tags("<qso_date:8:d>notadate");
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Owned("qso_date:8:d".to_string()))
+    );
+}
+
+#[tokio::test]
+async fn invalid_time() {
+    let mut f = tags("<time_on:6:t>notime");
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        Error::InvalidFormat(Cow::Owned("time_on:6:t".to_string()))
+    );
+}
+
+#[tokio::test]
 async fn as_str_roundtrip() {
     let b = true;
     let datum = Datum::Boolean(b);
-    let s = datum.as_str().unwrap();
+    let s = datum.as_str();
     assert_eq!(s, "Y");
     assert_eq!(Datum::String(s.to_string()).as_bool().unwrap(), b);
 
     let b = false;
     let datum = Datum::Boolean(b);
-    let s = datum.as_str().unwrap();
+    let s = datum.as_str();
     assert_eq!(s, "N");
     assert_eq!(Datum::String(s.to_string()).as_bool().unwrap(), b);
 
     let n = Decimal::from_str("14.070").unwrap();
     let datum = Datum::Number(n);
-    let s = datum.as_str().unwrap();
+    let s = datum.as_str();
     assert_eq!(Datum::String(s.to_string()).as_number().unwrap(), n);
 
     let d = NaiveDate::from_ymd_opt(2023, 12, 15).unwrap();
     let datum = Datum::Date(d);
-    let s = datum.as_str().unwrap();
+    let s = datum.as_str();
     assert_eq!(s, "20231215");
     assert_eq!(Datum::String(s.to_string()).as_date().unwrap(), d);
 
     let t = NaiveTime::from_hms_opt(14, 30, 0).unwrap();
     let datum = Datum::Time(t);
-    let s = datum.as_str().unwrap();
+    let s = datum.as_str();
     assert_eq!(s, "143000");
     assert_eq!(Datum::String(s.to_string()).as_time().unwrap(), t);
 
     let dt = NaiveDateTime::new(d, t);
     let datum = Datum::DateTime(dt);
-    let s = datum.as_str().unwrap();
+    let s = datum.as_str();
     assert_eq!(s, "20231215 143000");
     assert_eq!(Datum::String(s.to_string()).as_datetime().unwrap(), dt);
 
     let str = "hello world";
     let datum = Datum::String(str.to_string());
-    let s = datum.as_str().unwrap();
+    let s = datum.as_str();
     assert_eq!(s, str);
 }
 
@@ -513,7 +540,7 @@ async fn case_insensitive_markers() {
         let input = format!("<call:4>W1AW{variant}");
         let mut f = tags(&input).records();
         let rec = next_record(&mut f, false).await;
-        assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+        assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
         no_records(&mut f).await;
     }
 
@@ -521,11 +548,11 @@ async fn case_insensitive_markers() {
         tags("<adifver:5>3.1.4 <EOH><call:4>W1AW<EOR><call:5>AB9BH<eor>")
             .records();
     let rec = next_record(&mut f, true).await;
-    assert_eq!(rec.get("adifver").unwrap().as_str().unwrap(), "3.1.4");
+    assert_eq!(rec.get("adifver").unwrap().as_str(), "3.1.4");
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert_eq!(rec.get("call").unwrap().as_str(), "AB9BH");
     no_records(&mut f).await;
 }
 
@@ -533,7 +560,7 @@ async fn case_insensitive_markers() {
 async fn empty_field() {
     let mut f = RecordStream::new("<call:0><eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "");
+    assert_eq!(rec.get("call").unwrap().as_str(), "");
 }
 
 #[tokio::test]
@@ -561,7 +588,7 @@ async fn non_ascii_value() {
     // not sure now good of an idea this is, but it works
     let mut f = RecordStream::new("<name:6>André<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
-    assert_eq!(rec.get("name").unwrap().as_str().unwrap(), "André");
+    assert_eq!(rec.get("name").unwrap().as_str(), "André");
 }
 
 #[tokio::test]

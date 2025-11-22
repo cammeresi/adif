@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if record.is_header() {
             println!("Header:");
             if let Some(version) = record.get("adifver") {
-                println!("  ADIF Version: {}", version.as_str().unwrap());
+                println!("  ADIF Version: {}", version.as_str());
             }
             println!();
             continue;
@@ -58,22 +58,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!("Contact:");
         if let Some(call) = record.get("call") {
-            println!("  Call: {}", call.as_str().unwrap());
+            println!("  Call: {}", call.as_str());
         }
         if let Some(date) = record.get("qso_date") {
-            println!("  Date: {}", date.as_str().unwrap());
+            println!("  Date: {}", date.as_str());
         }
         if let Some(time) = record.get("time_on") {
-            println!("  Time: {}", time.as_str().unwrap());
+            println!("  Time: {}", time.as_str());
         }
         if let Some(freq) = record.get("freq") {
-            println!("  Frequency: {} MHz", freq.as_str().unwrap());
+            println!("  Frequency: {} MHz", freq.as_str());
         }
         if let Some(mode) = record.get("mode") {
-            println!("  Mode: {}", mode.as_str().unwrap());
+            println!("  Mode: {}", mode.as_str());
         }
         if let Some(band) = record.get("band") {
-            println!("  Band: {}", band.as_str().unwrap());
+            println!("  Band: {}", band.as_str());
         }
         println!();
     }

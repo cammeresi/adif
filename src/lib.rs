@@ -138,15 +138,15 @@ impl Datum {
     ///
     /// String variants return borrowed data.  All other types are returned in
     /// ADIF format (boolean Y/N, date YYYYMMDD, time HHMMSS).
-    pub fn as_str(&self) -> Option<Cow<'_, str>> {
+    pub fn as_str(&self) -> Cow<'_, str> {
         match self {
-            Self::String(s) => Some(Cow::Borrowed(s)),
-            Self::Boolean(b) => Some(Cow::Borrowed(if *b { "Y" } else { "N" })),
-            Self::Number(n) => Some(Cow::Owned(n.to_string())),
-            Self::Date(d) => Some(Cow::Owned(d.format("%Y%m%d").to_string())),
-            Self::Time(t) => Some(Cow::Owned(t.format("%H%M%S").to_string())),
+            Self::String(s) => Cow::Borrowed(s),
+            Self::Boolean(b) => Cow::Borrowed(if *b { "Y" } else { "N" }),
+            Self::Number(n) => Cow::Owned(n.to_string()),
+            Self::Date(d) => Cow::Owned(d.format("%Y%m%d").to_string()),
+            Self::Time(t) => Cow::Owned(t.format("%H%M%S").to_string()),
             Self::DateTime(dt) => {
-                Some(Cow::Owned(dt.format("%Y%m%d %H%M%S").to_string()))
+                Cow::Owned(dt.format("%Y%m%d %H%M%S").to_string())
             }
         }
     }
@@ -271,7 +271,7 @@ impl Record {
     /// let mut record = Record::new();
     /// record.insert("call", "W1AW").unwrap();
     /// record.insert("freq", "14.074").unwrap();
-    /// assert_eq!(record.get("call").unwrap().as_str().unwrap(), "W1AW");
+    /// assert_eq!(record.get("call").unwrap().as_str(), "W1AW");
     /// ```
     pub fn new() -> Self {
         Self::default()
@@ -284,7 +284,7 @@ impl Record {
     /// let mut header = Record::new_header();
     /// header.insert("adifver", "3.1.4").unwrap();
     /// assert!(header.is_header());
-    /// assert_eq!(header.get("adifver").unwrap().as_str().unwrap(), "3.1.4");
+    /// assert_eq!(header.get("adifver").unwrap().as_str(), "3.1.4");
     /// ```
     pub fn new_header() -> Self {
         Self {
@@ -324,8 +324,8 @@ impl Record {
     ///     true,
     /// );
     /// let record = s.next().await.unwrap().unwrap();
-    /// assert_eq!(record.get("call").unwrap().as_str().unwrap(), "W1AW");
-    /// assert_eq!(record.get("freq").unwrap().as_str().unwrap(), "14.074");
+    /// assert_eq!(record.get("call").unwrap().as_str(), "W1AW");
+    /// assert_eq!(record.get("freq").unwrap().as_str(), "14.074");
     /// assert!(record.get("missing").is_none());
     /// # });
     /// ```
@@ -357,7 +357,7 @@ impl Record {
     ///     Datum::String("20M".to_string()),
     /// )
     /// .unwrap();
-    /// assert_eq!(record.get("band").unwrap().as_str().unwrap(), "20M");
+    /// assert_eq!(record.get("band").unwrap().as_str(), "20M");
     /// let err = record.insert(
     ///     "call".to_string(),
     ///     Datum::String("AB9BH".to_string()),

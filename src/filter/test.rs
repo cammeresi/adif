@@ -61,25 +61,25 @@ async fn duplicate_key_error() {
 #[tokio::test]
 async fn normalize_mode_from_mode() {
     let record = parse_norm_mode("<mode:3>SSB<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "SSB");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "SSB");
 }
 
 #[tokio::test]
 async fn normalize_mode_from_app_lotw_mode() {
     let record = parse_norm_mode("<app_lotw_mode:3>FT8<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "FT8");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "FT8");
 }
 
 #[tokio::test]
 async fn normalize_mode_from_modegroup() {
     let record = parse_norm_mode("<app_lotw_modegroup:4>RTTY<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "RTTY");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "RTTY");
 }
 
 #[tokio::test]
 async fn normalize_mode_precedence() {
     let record = parse_norm_mode("<mode:3>SSB<app_lotw_mode:3>FT8<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "SSB");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "SSB");
 }
 
 #[tokio::test]
@@ -91,49 +91,49 @@ async fn normalize_mode_no_source() {
 #[tokio::test]
 async fn normalize_mode_mfsk_with_ft4() {
     let record = parse_norm_mode("<mode:4>MFSK<submode:3>FT4<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "FT4");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "FT4");
 }
 
 #[tokio::test]
 async fn normalize_mode_mfsk_with_q65() {
     let record = parse_norm_mode("<mode:4>MFSK<submode:3>Q65<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "Q65");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "Q65");
 }
 
 #[tokio::test]
 async fn normalize_mode_mfsk_with_other_submode() {
     let record = parse_norm_mode("<mode:4>MFSK<submode:3>XXX<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "MFSK");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "MFSK");
 }
 
 #[tokio::test]
 async fn normalize_mode_mfsk_no_submode() {
     let record = parse_norm_mode("<mode:4>MFSK<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "MFSK");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "MFSK");
 }
 
 #[tokio::test]
 async fn normalize_mode_non_mfsk_with_submode() {
     let record = parse_norm_mode("<mode:3>SSB<submode:3>FT4<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "SSB");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "SSB");
 }
 
 #[tokio::test]
 async fn normalize_mode_case_insensitive() {
     let record = parse_norm_mode("<mode:4>mfsk<submode:3>ft4<eor>").await;
-    assert_eq!(record.get(":mode").unwrap().as_str().unwrap(), "ft4");
+    assert_eq!(record.get(":mode").unwrap().as_str(), "ft4");
 }
 
 #[tokio::test]
 async fn normalize_band_uppercase() {
     let record = parse_norm_band("<band:3>20m<eor>").await;
-    assert_eq!(record.get(":band").unwrap().as_str().unwrap(), "20M");
+    assert_eq!(record.get(":band").unwrap().as_str(), "20M");
 }
 
 #[tokio::test]
 async fn normalize_band_already_upper() {
     let record = parse_norm_band("<band:3>40M<eor>").await;
-    assert_eq!(record.get(":band").unwrap().as_str().unwrap(), "40M");
+    assert_eq!(record.get(":band").unwrap().as_str(), "40M");
 }
 
 #[tokio::test]
@@ -245,7 +245,7 @@ async fn exclude_single_callsign() {
     );
     let mut filtered = exclude_callsigns(stream, &["W1AW"]);
     let record = next(&mut filtered).await;
-    assert_eq!(record.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert_eq!(record.get("call").unwrap().as_str(), "AB9BH");
     assert!(filtered.next().await.is_none());
 }
 
@@ -257,7 +257,7 @@ async fn exclude_multiple_callsigns() {
     );
     let mut filtered = exclude_callsigns(stream, &["W1AW", "W6RQ"]);
     let record = next(&mut filtered).await;
-    assert_eq!(record.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert_eq!(record.get("call").unwrap().as_str(), "AB9BH");
     assert!(filtered.next().await.is_none());
 }
 
@@ -269,7 +269,7 @@ async fn exclude_callsigns_case_insensitive() {
     );
     let mut filtered = exclude_callsigns(stream, &["w1aw"]);
     let record = next(&mut filtered).await;
-    assert_eq!(record.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert_eq!(record.get("call").unwrap().as_str(), "AB9BH");
     assert!(filtered.next().await.is_none());
 }
 
@@ -281,9 +281,9 @@ async fn exclude_callsigns_no_match() {
     );
     let mut filtered = exclude_callsigns(stream, &["W6RQ"]);
     let rec = next(&mut filtered).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let rec = next(&mut filtered).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert_eq!(rec.get("call").unwrap().as_str(), "AB9BH");
     assert!(filtered.next().await.is_none());
 }
 
@@ -307,9 +307,9 @@ async fn exclude_header_removes_header() {
     );
     let mut filtered = exclude_header(stream);
     let rec = next(&mut filtered).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let rec = next(&mut filtered).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert_eq!(rec.get("call").unwrap().as_str(), "AB9BH");
     assert!(filtered.next().await.is_none());
 }
 
@@ -321,9 +321,9 @@ async fn exclude_header_no_header() {
     );
     let mut filtered = exclude_header(stream);
     let rec = next(&mut filtered).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let rec = next(&mut filtered).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "AB9BH");
+    assert_eq!(rec.get("call").unwrap().as_str(), "AB9BH");
     assert!(filtered.next().await.is_none());
 }
 
@@ -332,7 +332,7 @@ async fn normalize_error_passthrough() {
     let stream = RecordStream::new("<call:4>W1AW<eor><bad".as_bytes(), false);
     let mut normalized = stream.normalize(|_record| {});
     let rec = next(&mut normalized).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let err = normalized.next().await.unwrap().unwrap_err();
     assert_eq!(
         err,
@@ -345,7 +345,7 @@ async fn filter_error_passthrough() {
     let stream = RecordStream::new("<call:4>W1AW<eor><bad".as_bytes(), false);
     let mut filtered = FilterExt::filter(stream, |_record| true);
     let rec = next(&mut filtered).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let err = filtered.next().await.unwrap().unwrap_err();
     assert_eq!(
         err,
@@ -358,7 +358,7 @@ async fn normalize_end_of_stream() {
     let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
     let mut normalized = stream.normalize(|_record| {});
     let rec = next(&mut normalized).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     assert!(normalized.next().await.is_none());
 }
 
@@ -367,6 +367,6 @@ async fn filter_end_of_stream() {
     let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
     let mut filtered = FilterExt::filter(stream, |_record| true);
     let rec = next(&mut filtered).await;
-    assert_eq!(rec.get("call").unwrap().as_str().unwrap(), "W1AW");
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     assert!(filtered.next().await.is_none());
 }

@@ -118,9 +118,7 @@ impl TagEncoder {
     fn encode_field(
         &self, name: &str, value: &Datum, dst: &mut BytesMut,
     ) -> Result<(), Error> {
-        let s = value.as_str().ok_or(Error::InvalidFormat(Cow::Borrowed(
-            "Cannot convert value to string",
-        )))?;
+        let s = value.as_str();
 
         dst.put_u8(b'<');
         dst.put_slice(name.as_bytes());

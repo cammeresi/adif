@@ -145,7 +145,7 @@ fn into_fields() {
     let fields: Vec<_> = record.into_fields().collect();
     assert_eq!(fields.len(), 2);
     assert_eq!(fields[0].0, "call");
-    assert_eq!(fields[0].1.as_str().unwrap(), "W1AW");
+    assert_eq!(fields[0].1.as_str(), "W1AW");
     assert_eq!(fields[1].0, "freq");
     assert_eq!(fields[1].1.as_number().unwrap(), Decimal::from(14));
 }

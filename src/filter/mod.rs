@@ -175,10 +175,10 @@ where
             .get("mode")
             .or_else(|| record.get("app_lotw_mode"))
             .or_else(|| record.get("app_lotw_modegroup"))
-            .and_then(|m| m.as_str());
+            .map(|m| m.as_str());
 
         let Some(mode) = mode else { return };
-        let sub = record.get("submode").and_then(|s| s.as_str());
+        let sub = record.get("submode").map(|s| s.as_str());
 
         let mode = match sub {
             Some(sub)
@@ -207,7 +207,7 @@ where
 /// let stream = TagDecoder::new_stream(&data[..], true).records();
 /// let mut stream = normalize_band(stream);
 /// let record = stream.next().await.unwrap().unwrap();
-/// let band = record.get(":band").and_then(|b| b.as_str()).unwrap();
+/// let band = record.get(":band").map(|b| b.as_str()).unwrap();
 /// assert_eq!(band, "20M");
 /// # });
 /// ```
@@ -220,7 +220,7 @@ where
     const BAND: &str = ":band";
 
     stream.normalize(|record| {
-        let Some(band) = record.get("band").and_then(|b| b.as_str()) else {
+        let Some(band) = record.get("band").map(|b| b.as_str()) else {
             return;
         };
 
@@ -247,7 +247,7 @@ where
         callsigns.iter().map(|c| c.to_uppercase()).collect();
 
     stream.filter(move |record| {
-        let Some(call) = record.get("call").and_then(|c| c.as_str()) else {
+        let Some(call) = record.get("call").map(|c| c.as_str()) else {
             return true;
         };
         !exclude.iter().any(|e| e.eq_ignore_ascii_case(&call))
@@ -266,7 +266,7 @@ where
 /// let mut stream = exclude_header(stream);
 /// let record = stream.next().await.unwrap().unwrap();
 /// assert!(!record.is_header());
-/// assert_eq!(record.get("call").unwrap().as_str().unwrap(), "K2XYZ");
+/// assert_eq!(record.get("call").unwrap().as_str(), "K2XYZ");
 /// # });
 /// ```
 pub fn exclude_header<S>(stream: S) -> Filter<S, impl FnMut(&Record) -> bool>

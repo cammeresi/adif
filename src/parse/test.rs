@@ -251,6 +251,7 @@ struct TrickleReader {
     data: Vec<u8>,
     pos: usize,
     chunk: usize,
+    delayed: bool,
 }
 
 impl TrickleReader {
@@ -259,13 +260,14 @@ impl TrickleReader {
             data: data.as_bytes().to_vec(),
             pos: 0,
             chunk,
+            delayed: false,
         }
     }
 }
 
 impl AsyncRead for TrickleReader {
     fn poll_read(
-        mut self: Pin<&mut Self>, _cx: &mut Context<'_>,
+        mut self: Pin<&mut Self>, cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let remaining = self.data.len() - self.pos;
@@ -273,14 +275,21 @@ impl AsyncRead for TrickleReader {
             return Poll::Ready(Ok(()));
         }
 
+        if !self.delayed {
+            self.delayed = true;
+            cx.waker().wake_by_ref();
+            return Poll::Pending;
+        }
+
         let to_read = remaining.min(self.chunk).min(buf.remaining());
         buf.put_slice(&self.data[self.pos..self.pos + to_read]);
         self.pos += to_read;
+        self.delayed = false;
         Poll::Ready(Ok(()))
     }
 }
 
-async fn try_trickle(chunk: usize) {
+async fn try_trickle_tags(chunk: usize) {
     let reader =
         TrickleReader::new("Foo <bar:3>baz <qux:5:n>12345 <eoh>", chunk);
     let mut f = TagDecoder::new_stream(reader, true);
@@ -301,10 +310,65 @@ async fn try_trickle(chunk: usize) {
 }
 
 #[tokio::test]
-async fn trickle() {
-    try_trickle(1).await;
-    try_trickle(2).await;
-    try_trickle(3).await;
+async fn trickle_tags() {
+    try_trickle_tags(1).await;
+    try_trickle_tags(2).await;
+    try_trickle_tags(3).await;
+}
+
+#[tokio::test]
+async fn trickle_invalid() {
+    let reader = TrickleReader::new("<foo:3:n>abc", 1);
+    let mut f = TagDecoder::new_stream(reader, true);
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(err, Error::InvalidFormat(Cow::Owned("foo:3:n".to_string())));
+}
+
+struct TrickleStream<S> {
+    inner: S,
+    delayed: bool,
+}
+
+impl<S> TrickleStream<S> {
+    fn new(inner: S) -> Self {
+        Self {
+            inner,
+            delayed: false,
+        }
+    }
+}
+
+impl<S> Stream for TrickleStream<S>
+where
+    S: Stream + Unpin,
+{
+    type Item = S::Item;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>, cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        if !self.delayed {
+            self.delayed = true;
+            cx.waker().wake_by_ref();
+            return Poll::Pending;
+        }
+
+        self.delayed = false;
+        Pin::new(&mut self.inner).poll_next(cx)
+    }
+}
+
+#[tokio::test]
+async fn trickle_records() {
+    let reader = TrickleReader::new("<foo:3>abc<eor><foo:4>defg<eor>", 1);
+    let reader = TagDecoder::new_stream(reader, false);
+    let reader = TrickleStream::new(reader);
+    let mut f = reader.records();
+
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("foo").unwrap().as_str(), "abc");
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("foo").unwrap().as_str(), "defg");
 }
 
 #[tokio::test]

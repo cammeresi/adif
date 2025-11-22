@@ -142,10 +142,7 @@ where
                 let date = if let Some(date_off) = date_off {
                     date_off
                 } else if time_off < time_on {
-                    match date.checked_add_days(Days::new(1)) {
-                        Some(d) => d,
-                        None => return, // can't overflow
-                    }
+                    date + Days::new(1)
                 } else {
                     date
                 };
@@ -261,12 +258,12 @@ where
 /// use futures::StreamExt;
 ///
 /// # tokio_test::block_on(async {
-/// let data = b"<foo:3>bar<eoh><call:5>K2XYZ<eor>";
+/// let data = b"<foo:3>bar<eoh><call:4>W1AW<eor>";
 /// let stream = TagDecoder::new_stream(&data[..], true).records();
 /// let mut stream = exclude_header(stream);
 /// let record = stream.next().await.unwrap().unwrap();
 /// assert!(!record.is_header());
-/// assert_eq!(record.get("call").unwrap().as_str(), "K2XYZ");
+/// assert_eq!(record.get("call").unwrap().as_str(), "W1AW");
 /// # });
 /// ```
 pub fn exclude_header<S>(stream: S) -> Filter<S, impl FnMut(&Record) -> bool>

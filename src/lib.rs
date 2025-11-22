@@ -349,16 +349,12 @@ impl Record {
     /// use futures::StreamExt;
     /// let mut s = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
     /// let mut record = s.next().await.unwrap().unwrap();
-    /// record.insert(
-    ///     "band".to_string(),
-    ///     Datum::String("20M".to_string()),
-    /// )
-    /// .unwrap();
+    /// record
+    ///     .insert("band".to_string(), Datum::String("20M".to_string()))
+    ///     .unwrap();
     /// assert_eq!(record.get("band").unwrap().as_str(), "20M");
-    /// let err = record.insert(
-    ///     "call".to_string(),
-    ///     Datum::String("AB9BH".to_string()),
-    /// );
+    /// let err = record
+    ///     .insert("call".to_string(), Datum::String("AB9BH".to_string()));
     /// assert!(err.is_err());
     /// # });
     /// ```

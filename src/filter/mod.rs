@@ -104,8 +104,8 @@ impl<S> FilterExt for S where S: Stream {}
 /// components.  Handle date crossing when time_off is earlier than time_on.
 ///
 /// ```
-/// use adif::{Datum, Record, RecordStreamExt, TagDecoder};
 /// use adif::filter::normalize_times;
+/// use adif::{Datum, Record, RecordStreamExt, TagDecoder};
 /// use chrono::{NaiveDate, NaiveTime, Timelike};
 /// use futures::StreamExt;
 ///
@@ -114,7 +114,10 @@ impl<S> FilterExt for S where S: Stream {}
 /// let stream = TagDecoder::new_stream(&data[..], true).records();
 /// let mut stream = normalize_times(stream);
 /// let record = stream.next().await.unwrap().unwrap();
-/// let dt = record.get(":time_on").and_then(|d| d.as_datetime()).unwrap();
+/// let dt = record
+///     .get(":time_on")
+///     .and_then(|d| d.as_datetime())
+///     .unwrap();
 /// assert_eq!(dt.date(), NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
 /// assert_eq!(dt.time(), NaiveTime::from_hms_opt(23, 0, 0).unwrap());
 /// # });
@@ -196,7 +199,9 @@ where
 /// Normalize band field to uppercase.
 ///
 /// ```
-/// use adif::{filter::normalize_band, Record, RecordStreamExt, TagDecoder};
+/// use adif::{
+///     Record, RecordStreamExt, TagDecoder, filter::normalize_band,
+/// };
 /// use futures::StreamExt;
 ///
 /// # tokio_test::block_on(async {
@@ -254,7 +259,9 @@ where
 /// Exclude header records from the stream.
 ///
 /// ```
-/// use adif::{filter::exclude_header, Record, RecordStreamExt, TagDecoder};
+/// use adif::{
+///     Record, RecordStreamExt, TagDecoder, filter::exclude_header,
+/// };
 /// use futures::StreamExt;
 ///
 /// # tokio_test::block_on(async {

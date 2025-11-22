@@ -22,5 +22,7 @@ tokio = { version = "1.48.0", features = ["io-util"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 
 [dev-dependencies]
+proptest = "1"
+rust_decimal = { version = "1.39", features = ["proptest"] }
 tokio = { version = "1.48.0", features = ["macros", "rt"] }
 tokio-test = "0.4"

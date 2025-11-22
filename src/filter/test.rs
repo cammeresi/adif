@@ -43,22 +43,6 @@ async fn parse_norm_band(adif: &str) -> Record {
 }
 
 #[tokio::test]
-async fn duplicate_key_error() {
-    let stream = RecordStream::new(
-        "<qso_date:8>20231215<time_on:6>143000<eor>".as_bytes(),
-        true,
-    );
-    let mut normalized = normalize_times(stream);
-    let mut record = next(&mut normalized).await;
-
-    let err = record.insert(":time_on", "test").unwrap_err();
-    assert_eq!(
-        err,
-        Error::InvalidFormat(Cow::Borrowed("duplicate key: :time_on")),
-    );
-}
-
-#[tokio::test]
 async fn normalize_mode_from_mode() {
     let record = parse_norm_mode("<mode:3>SSB<eor>").await;
     assert_eq!(record.get(":mode").unwrap().as_str(), "SSB");

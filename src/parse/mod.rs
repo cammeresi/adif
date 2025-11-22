@@ -4,7 +4,6 @@ use crate::{Datum, Error, Field, Record, Tag};
 use bytes::{Buf, BytesMut};
 use chrono::{NaiveDate, NaiveTime};
 use futures::stream::Stream;
-use indexmap::IndexMap;
 use rust_decimal::Decimal;
 use std::borrow::Cow;
 use std::pin::Pin;
@@ -28,7 +27,8 @@ pub struct TagDecoder {
 impl TagDecoder {
     /// Create a new stream that returns ADIF tags.
     ///
-    /// Tag names are converted to lowercase.
+    /// Tag names preserve their original case but are compared
+    /// case-insensitively.
     ///
     /// ```
     /// # tokio_test::block_on(async {
@@ -37,7 +37,7 @@ impl TagDecoder {
     /// let mut t = TagDecoder::new_stream("<FOO:3>123".as_bytes(), true);
     /// let tag = t.next().await.unwrap().unwrap();
     /// let field = tag.as_field().unwrap();
-    /// assert_eq!(field.name(), "foo");
+    /// assert_eq!(field.name(), "FOO");
     /// assert_eq!(field.value().as_str(), "123");
     /// # });
     /// ```
@@ -89,9 +89,9 @@ impl TagDecoder {
         str::from_utf8(data).map_err(|_| Self::invalid_tag(tag))
     }
 
-    fn parse_value(
-        src: &BytesMut, offset: usize, tag: &[u8],
-    ) -> Result<Option<(String, Datum, usize)>, Error> {
+    fn parse_value<'a>(
+        src: &'a BytesMut, offset: usize, tag: &'a [u8],
+    ) -> Result<Option<(&'a str, Datum, usize)>, Error> {
         let err = || Self::invalid_tag(tag);
 
         let mut parts = tag.split(|&b| b == b':');
@@ -101,7 +101,7 @@ impl TagDecoder {
                 _ => return Err(err()),
             };
 
-        let name = Self::as_str(name, tag)?.to_ascii_lowercase();
+        let name = Self::as_str(name, tag)?;
         let len = Self::as_str(len, tag)?;
         let len = len.parse::<usize>().map_err(|_| err())?;
         let typ = typ.map(|t| Self::as_str(t, tag)).transpose()?;
@@ -152,9 +152,10 @@ impl Decoder for TagDecoder {
         let Some((name, value, end)) = Self::parse_value(src, end, tag)? else {
             return Ok(None);
         };
+        let tag = Tag::Field(Field::new(name, value));
         src.advance(end);
 
-        Ok(Some(Tag::Field(Field::new(name, value))))
+        Ok(Some(tag))
     }
 
     fn decode_eof(
@@ -187,7 +188,7 @@ pub trait RecordStreamExt: Stream {
     {
         RecordStream {
             stream: self,
-            fields: IndexMap::new(),
+            record: Record::new(),
         }
     }
 }
@@ -197,13 +198,14 @@ impl<S> RecordStreamExt for S where S: Stream {}
 /// Stream that aggregates ADIF tags into complete records.
 pub struct RecordStream<S> {
     stream: S,
-    fields: IndexMap<String, Datum>,
+    record: Record,
 }
 
 impl<S> RecordStream<S> {
     fn make(&mut self, header: bool) -> Poll<Option<Result<Record, Error>>> {
-        let fields = std::mem::take(&mut self.fields);
-        Poll::Ready(Some(Ok(Record { header, fields })))
+        let mut record = std::mem::take(&mut self.record);
+        record.header = header;
+        Poll::Ready(Some(Ok(record)))
     }
 }
 
@@ -213,7 +215,8 @@ where
 {
     /// Create a new stream that returns ADIF records.
     ///
-    /// Tag names in the returned records are converted to lowercase.
+    /// Tag names preserve their original case but are compared
+    /// case-insensitively.
     /// ```
     /// # tokio_test::block_on(async {
     /// use adif::RecordStream;
@@ -221,6 +224,7 @@ where
     /// let mut r = RecordStream::new("<FOO:3>123<eor>".as_bytes(), true);
     /// let rec = r.next().await.unwrap().unwrap();
     /// assert_eq!(rec.get("foo").unwrap().as_number().unwrap(), 123.into());
+    /// assert_eq!(rec.get("FOO").unwrap().as_number().unwrap(), 123.into());
     /// # });
     /// ```
     pub fn new(reader: R, ignore_partial: bool) -> Self {
@@ -242,7 +246,10 @@ where
                 Poll::Ready(Some(Ok(Tag::Eoh))) => return self.make(true),
                 Poll::Ready(Some(Ok(Tag::Eor))) => return self.make(false),
                 Poll::Ready(Some(Ok(Tag::Field(field)))) => {
-                    self.fields.insert(field.name, field.value);
+                    if let Err(e) = self.record.insert(field.name, field.value)
+                    {
+                        return Poll::Ready(Some(Err(e)));
+                    }
                 }
                 Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(e))),
                 Poll::Ready(None) => return Poll::Ready(None),

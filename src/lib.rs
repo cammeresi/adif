@@ -10,12 +10,12 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use indexmap::{IndexMap, map::Entry};
 use rust_decimal::Decimal;
-use std::borrow::{Borrow, Cow};
-use std::hash::Hash;
+use std::borrow::Cow;
 use std::io;
 use std::str::FromStr;
 use thiserror::Error;
 
+mod cistring;
 pub mod filter;
 pub mod parse;
 pub mod write;
@@ -23,6 +23,7 @@ pub mod write;
 #[cfg(test)]
 mod test;
 
+pub use cistring::{CiStr, CiString};
 pub use filter::{FilterExt, NormalizeExt};
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
 pub use write::{OutputTypes, RecordSink, TagEncoder, TagSink, TagSinkExt};
@@ -197,7 +198,7 @@ impl From<NaiveDateTime> for Datum {
 /// A single tag in an ADIF stream and its associated value
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Field {
-    name: String,
+    name: CiString,
     value: Datum,
 }
 
@@ -205,7 +206,7 @@ impl Field {
     /// Create a new field.
     pub fn new<N, V>(name: N, value: V) -> Self
     where
-        N: Into<String>,
+        N: Into<CiString>,
         V: Into<Datum>,
     {
         Self {
@@ -216,7 +217,7 @@ impl Field {
 
     /// Return name of the tag.
     pub fn name(&self) -> &str {
-        &self.name
+        self.name.as_str()
     }
 
     /// Return the value of the tag.
@@ -260,7 +261,7 @@ impl Tag {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Record {
     header: bool,
-    fields: IndexMap<String, Datum>,
+    fields: IndexMap<CiString, Datum>,
 }
 
 impl Record {
@@ -329,12 +330,8 @@ impl Record {
     /// assert!(record.get("missing").is_none());
     /// # });
     /// ```
-    pub fn get<Q>(&self, name: &Q) -> Option<&Datum>
-    where
-        String: Borrow<Q>,
-        Q: Hash + Eq + ?Sized,
-    {
-        self.fields.get(name)
+    pub fn get(&self, name: &str) -> Option<&Datum> {
+        self.fields.get(CiStr::new(name))
     }
 
     /// Add a field to the record.
@@ -367,7 +364,7 @@ impl Record {
     /// ```
     pub fn insert<N, V>(&mut self, name: N, value: V) -> Result<(), Error>
     where
-        N: Into<String>,
+        N: Into<CiString>,
         V: Into<Datum>,
     {
         let name = name.into();
@@ -384,11 +381,11 @@ impl Record {
 
     /// Consume the record and return an iterator over owned fields.
     pub fn into_fields(self) -> impl Iterator<Item = (String, Datum)> {
-        self.fields.into_iter()
+        self.fields.into_iter().map(|(k, v)| (k.into_string(), v))
     }
 
     /// Return an iterator over all fields in this record.
-    pub fn fields(&self) -> impl Iterator<Item = (&String, &Datum)> {
-        self.fields.iter()
+    pub fn fields(&self) -> impl Iterator<Item = (&str, &Datum)> {
+        self.fields.iter().map(|(k, v)| (k.as_str(), v))
     }
 }

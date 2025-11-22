@@ -166,7 +166,7 @@ async fn uppercase() {
     let mut f = tags("<FOO:3>Bar");
 
     let field = next_field(&mut f).await;
-    assert_eq!(field.name(), "foo");
+    assert_eq!(field.name(), "FOO");
     assert_eq!(field.value(), &"Bar".into());
     no_tags(&mut f).await;
 }
@@ -179,6 +179,15 @@ async fn underscore() {
     assert_eq!(field.name(), "my_tag");
     assert_eq!(field.value(), &"xyz".into());
     no_tags(&mut f).await;
+}
+
+#[tokio::test]
+async fn case_insensitive_lookup() {
+    let mut s = RecordStream::new("<FOO:3>Bar<eor>".as_bytes(), true);
+    let record = s.next().await.unwrap().unwrap();
+    assert_eq!(record.get("FOO").unwrap().as_str(), "Bar");
+    assert_eq!(record.get("foo").unwrap().as_str(), "Bar");
+    assert_eq!(record.get("FoO").unwrap().as_str(), "Bar");
 }
 
 #[tokio::test]

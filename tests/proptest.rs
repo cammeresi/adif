@@ -28,6 +28,18 @@ fn string_datum_strategy() -> impl Strategy<Value = Datum> {
     any::<String>().prop_map(Datum::String)
 }
 
+fn string_datum_strategy_for_whitespace() -> impl Strategy<Value = Datum> {
+    prop::collection::vec(
+        prop_oneof![
+            prop::char::range(' ', ';'), // space through ;
+            prop::char::range('=', '='), // =
+            prop::char::range('?', '~'), // ? through ~
+        ],
+        0..20,
+    )
+    .prop_map(|v| Datum::String(v.into_iter().collect()))
+}
+
 fn boolean_datum_strategy() -> impl Strategy<Value = Datum> {
     any::<bool>().prop_map(Datum::Boolean)
 }
@@ -51,53 +63,116 @@ fn time_datum_strategy() -> impl Strategy<Value = Datum> {
     })
 }
 
-fn datum_strategy() -> impl Strategy<Value = Datum> {
-    prop_oneof![
-        string_datum_strategy(),
-        boolean_datum_strategy(),
-        number_datum_strategy(),
-        date_datum_strategy(),
-        time_datum_strategy(),
-    ]
+fn datum_strategy(whitespace: bool) -> impl Strategy<Value = Datum> {
+    if whitespace {
+        prop_oneof![
+            string_datum_strategy_for_whitespace(),
+            boolean_datum_strategy(),
+            number_datum_strategy(),
+            date_datum_strategy(),
+            time_datum_strategy(),
+        ]
+        .boxed()
+    } else {
+        prop_oneof![
+            string_datum_strategy(),
+            boolean_datum_strategy(),
+            number_datum_strategy(),
+            date_datum_strategy(),
+            time_datum_strategy(),
+        ]
+        .boxed()
+    }
 }
 
-fn record_strategy() -> impl Strategy<Value = Record> {
-    prop::collection::hash_map(field_name_strategy(), datum_strategy(), 0..=10)
-        .prop_map(|fields| {
-            let mut record = Record::new();
-            for (name, datum) in fields {
-                let _ = record.insert(name, datum);
-            }
-            record
-        })
+fn record_strategy(whitespace: bool) -> impl Strategy<Value = Record> {
+    prop::collection::hash_map(
+        field_name_strategy(),
+        datum_strategy(whitespace),
+        0..=10,
+    )
+    .prop_map(|fields| {
+        let mut record = Record::new();
+        for (name, datum) in fields {
+            let _ = record.insert(name, datum);
+        }
+        record
+    })
 }
 
-fn header_strategy() -> impl Strategy<Value = Record> {
-    prop::collection::hash_map(field_name_strategy(), datum_strategy(), 0..=3)
-        .prop_map(|fields| {
-            let mut record = Record::new_header();
-            for (name, datum) in fields {
-                let _ = record.insert(name, datum);
-            }
-            record
-        })
+fn header_strategy(whitespace: bool) -> impl Strategy<Value = Record> {
+    prop::collection::hash_map(
+        field_name_strategy(),
+        datum_strategy(whitespace),
+        0..=3,
+    )
+    .prop_map(|fields| {
+        let mut record = Record::new_header();
+        for (name, datum) in fields {
+            let _ = record.insert(name, datum);
+        }
+        record
+    })
 }
 
 fn output_types_strategy() -> impl Strategy<Value = OutputTypes> {
     prop_oneof![Just(OutputTypes::Always), Just(OutputTypes::OnlyNonString),]
 }
 
-async fn test_roundtrip(
-    header: Record, records: Vec<Record>, output_types: OutputTypes,
-) {
+fn whitespace_injection_strategy()
+-> impl Strategy<Value = Vec<(usize, Vec<u8>)>> {
+    prop::collection::vec(
+        (
+            0usize..=5,
+            prop::collection::vec(
+                prop::sample::select(vec![b' ', b'\n', b'\t']),
+                1..=3,
+            ),
+        ),
+        3,
+    )
+}
+
+async fn write_records(
+    header: &Record, records: &[Record], output_types: OutputTypes,
+    whitespace_injections: Option<&[(usize, Vec<u8>)]>,
+) -> Vec<u8> {
     let mut buf = Vec::new();
     let mut sink = RecordSink::with_types(&mut buf, output_types);
 
     sink.send(header.clone()).await.unwrap();
-    for record in &records {
+    for record in records {
         sink.send(record.clone()).await.unwrap();
     }
     sink.close().await.unwrap();
+
+    let Some(whitespace_injections) = whitespace_injections else {
+        return buf;
+    };
+
+    let mut result = Vec::new();
+    let mut injections = whitespace_injections.iter().cycle();
+    let mut tags_to_skip = 0;
+
+    for &byte in &buf {
+        if byte == b'<' {
+            if tags_to_skip == 0 {
+                let (skip, ws) = injections.next().unwrap();
+                result.extend_from_slice(ws);
+                tags_to_skip = *skip;
+            } else {
+                tags_to_skip -= 1;
+            }
+        }
+        result.push(byte);
+    }
+    result
+}
+
+async fn test_roundtrip(
+    header: Record, records: Vec<Record>, output_types: OutputTypes,
+) {
+    let buf = write_records(&header, &records, output_types, None).await;
 
     let mut stream = RecordStream::new(&buf[..], true);
     let parsed_header = stream.next().await.unwrap().unwrap();
@@ -143,14 +218,7 @@ fn assert_records_equal_coerced(parsed: &Record, original: &Record) {
 }
 
 async fn test_roundtrip_never(header: Record, records: Vec<Record>) {
-    let mut buf = Vec::new();
-    let mut sink = RecordSink::with_types(&mut buf, OutputTypes::Never);
-
-    sink.send(header.clone()).await.unwrap();
-    for record in &records {
-        sink.send(record.clone()).await.unwrap();
-    }
-    sink.close().await.unwrap();
+    let buf = write_records(&header, &records, OutputTypes::Never, None).await;
 
     let mut stream = RecordStream::new(&buf[..], true);
     let parsed_header = stream.next().await.unwrap().unwrap();
@@ -160,6 +228,30 @@ async fn test_roundtrip_never(header: Record, records: Vec<Record>) {
         let parsed = stream.next().await.unwrap().unwrap();
         assert!(!parsed.is_header());
         assert_records_equal_coerced(&parsed, &record);
+    }
+    assert!(stream.next().await.is_none());
+}
+
+async fn test_whitespace(
+    header: Record, records: Vec<Record>, output_types: OutputTypes,
+    whitespace_injections: Vec<(usize, Vec<u8>)>,
+) {
+    let buf = write_records(
+        &header,
+        &records,
+        output_types,
+        Some(&whitespace_injections),
+    )
+    .await;
+
+    let mut stream = RecordStream::new(&buf[..], true);
+    let parsed_header = stream.next().await.unwrap().unwrap();
+    assert!(parsed_header.is_header());
+    assert_eq!(parsed_header, header);
+    for record in records {
+        let parsed = stream.next().await.unwrap().unwrap();
+        assert!(!parsed.is_header());
+        assert_eq!(parsed, record);
     }
     assert!(stream.next().await.is_none());
 }
@@ -197,8 +289,8 @@ proptest! {
 
     #[test]
     fn roundtrip_typed(
-        header in header_strategy(),
-        records in prop::collection::vec(record_strategy(), 0..=20),
+        header in header_strategy(false),
+        records in prop::collection::vec(record_strategy(false), 0..=20),
         output_types in output_types_strategy()
     ) {
         tokio_test::block_on(test_roundtrip(header, records, output_types));
@@ -206,15 +298,27 @@ proptest! {
 
     #[test]
     fn roundtrip_untyped(
-        header in header_strategy(),
-        records in prop::collection::vec(record_strategy(), 0..=20)
+        header in header_strategy(false),
+        records in prop::collection::vec(record_strategy(false), 0..=20)
     ) {
         tokio_test::block_on(test_roundtrip_never(header, records));
     }
 
     #[test]
+    fn roundtrip_with_whitespace(
+        header in header_strategy(true),
+        records in prop::collection::vec(record_strategy(true), 0..=20),
+        output_types in output_types_strategy(),
+        whitespace in whitespace_injection_strategy()
+    ) {
+        let test =
+            test_whitespace(header, records, output_types, whitespace);
+        tokio_test::block_on(test);
+    }
+
+    #[test]
     fn truncation_error_position(
-        records in prop::collection::vec(record_strategy(), 1..=2)
+        records in prop::collection::vec(record_strategy(false), 1..=2)
     ) {
         tokio_test::block_on(test_truncation_error_position(records));
     }

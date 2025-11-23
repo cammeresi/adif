@@ -1,8 +1,8 @@
 use super::*;
 use crate::parse::{RecordStream, TagStream};
+use crate::test::invalid_format;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use futures::StreamExt;
-use std::borrow::Cow;
 
 fn dt(
     year: i32, month: u32, day: u32, hour: u32, min: u32, sec: u32,
@@ -320,7 +320,7 @@ async fn normalize_error_passthrough() {
     let err = normalized.next().await.unwrap().unwrap_err();
     assert_eq!(
         err,
-        Error::InvalidFormat(Cow::Borrowed("partial data at end of stream"))
+        invalid_format("partial data at end of stream", 1, 18, 17)
     );
 }
 
@@ -333,7 +333,7 @@ async fn filter_error_passthrough() {
     let err = filtered.next().await.unwrap().unwrap_err();
     assert_eq!(
         err,
-        Error::InvalidFormat(Cow::Borrowed("partial data at end of stream"))
+        invalid_format("partial data at end of stream", 1, 18, 17)
     );
 }
 

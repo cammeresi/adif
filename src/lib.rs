@@ -11,6 +11,7 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use indexmap::{IndexMap, map::Entry};
 use rust_decimal::Decimal;
 use std::borrow::Cow;
+use std::fmt::{Display, Formatter};
 use std::io;
 use std::str::FromStr;
 use thiserror::Error;
@@ -28,6 +29,24 @@ pub use filter::{FilterExt, NormalizeExt};
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
 pub use write::{OutputTypes, RecordSink, TagEncoder, TagSink, TagSinkExt};
 
+/// Position information for errors in the input stream.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Position {
+    /// Line number where error occurred (1-based)
+    pub line: usize,
+    /// Column number where error occurred (1-based)
+    pub column: usize,
+    /// Byte offset in the stream where error occurred (0-based)
+    pub byte: usize,
+}
+
+impl Display for Position {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let Position { line, column, byte } = self;
+        write!(f, "line {line}, column {column} (byte {byte})",)
+    }
+}
+
 /// Errors that can occur during ADIF parsing and processing.
 #[derive(Debug, Error)]
 pub enum Error {
@@ -36,10 +55,14 @@ pub enum Error {
     Io(#[from] io::Error),
     /// Invalid ADIF format encountered during parsing.
     ///
-    /// This includes malformed tags, invalid type specifiers, or duplicate
-    /// keys in records.
-    #[error("Invalid ADIF format: {0}")]
-    InvalidFormat(Cow<'static, str>),
+    /// This includes malformed tags and invalid type specifiers.
+    #[error("Invalid ADIF format: {message} (at {position})")]
+    InvalidFormat {
+        /// Error message describing what went wrong
+        message: Cow<'static, str>,
+        /// Position in the input stream
+        position: Position,
+    },
     /// Duplicate key encountered in a record.
     #[error("Duplicate key in record: {key}")]
     DuplicateKey {
@@ -62,7 +85,16 @@ impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Error::Io(a), Error::Io(b)) => a.kind() == b.kind(),
-            (Error::InvalidFormat(a), Error::InvalidFormat(b)) => a == b,
+            (
+                Error::InvalidFormat {
+                    message: ma,
+                    position: pa,
+                },
+                Error::InvalidFormat {
+                    message: mb,
+                    position: pb,
+                },
+            ) => ma == mb && pa == pb,
             (
                 Error::DuplicateKey {
                     key: ka,

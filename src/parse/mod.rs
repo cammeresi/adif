@@ -1,6 +1,6 @@
 //! Parsing of ADIF data at various levels of sophistication
 
-use crate::{Datum, Error, Field, Record, Tag};
+use crate::{Datum, Error, Field, Position, Record, Tag};
 use bytes::{Buf, BytesMut};
 use chrono::{NaiveDate, NaiveTime};
 use futures::stream::Stream;
@@ -15,6 +15,7 @@ use tokio_util::codec::{Decoder, FramedRead};
 #[cfg(test)]
 mod test;
 
+#[derive(Debug)]
 enum ParserTag {
     Field(Field),
     Eoh,
@@ -29,6 +30,9 @@ pub type TagStream<R> = FramedRead<R, TagDecoder>;
 #[derive(Debug, Default)]
 pub struct TagDecoder {
     ignore_partial: bool,
+    consumed: usize,
+    line: usize,
+    column: usize,
 }
 
 impl TagDecoder {
@@ -52,54 +56,100 @@ impl TagDecoder {
     where
         R: AsyncRead,
     {
-        FramedRead::new(reader, Self { ignore_partial })
+        let decoder = Self {
+            ignore_partial,
+            consumed: 0,
+            line: 1,
+            column: 1,
+        };
+        FramedRead::new(reader, decoder)
     }
 
-    fn invalid_tag(tag: &[u8]) -> Error {
-        Error::InvalidFormat(Cow::Owned(
-            String::from_utf8_lossy(tag).into_owned(),
-        ))
+    fn calculate_position(
+        &self, buffer: &[u8], offset: usize,
+    ) -> (usize, usize, usize) {
+        let mut line = self.line;
+        let mut column = self.column;
+
+        for &byte in &buffer[..offset] {
+            if byte == b'\n' {
+                line += 1;
+                column = 1;
+            } else {
+                column += 1;
+            }
+        }
+
+        (line, column, self.consumed + offset)
+    }
+
+    fn invalid_tag(
+        &self, buffer: &[u8], tag: &[u8], tag_begin: usize,
+    ) -> Error {
+        let (line, column, byte) = self.calculate_position(buffer, tag_begin);
+        Error::InvalidFormat {
+            message: Cow::Owned(String::from_utf8_lossy(tag).into_owned()),
+            position: Position { line, column, byte },
+        }
+    }
+
+    fn advance(&mut self, src: &mut BytesMut, consumed: usize) {
+        for &byte in &src[..consumed] {
+            if byte == b'\n' {
+                self.line += 1;
+                self.column = 1;
+            } else {
+                self.column += 1;
+            }
+        }
+        self.consumed += consumed;
+        src.advance(consumed);
     }
 
     fn parse_typed_value(
-        tag: &[u8], v: &str, typ: Option<&str>,
+        &self, buffer: &[u8], tag: &[u8], v: &str, typ: Option<&str>,
+        tag_begin: usize,
     ) -> Result<Datum, Error> {
         match typ {
             Some("n") | Some("N") => {
-                let num =
-                    Decimal::from_str(v).map_err(|_| Self::invalid_tag(tag))?;
+                let num = Decimal::from_str(v)
+                    .map_err(|_| self.invalid_tag(buffer, tag, tag_begin))?;
                 Ok(Datum::Number(num))
             }
             Some("b") | Some("B") => {
                 let b = match v {
                     "Y" | "y" => true,
                     "N" | "n" => false,
-                    _ => return Err(Self::invalid_tag(tag)),
+                    _ => return Err(self.invalid_tag(buffer, tag, tag_begin)),
                 };
                 Ok(Datum::Boolean(b))
             }
             Some("d") | Some("D") => {
                 let date = NaiveDate::parse_from_str(v, "%Y%m%d")
-                    .map_err(|_| Self::invalid_tag(tag))?;
+                    .map_err(|_| self.invalid_tag(buffer, tag, tag_begin))?;
                 Ok(Datum::Date(date))
             }
             Some("t") | Some("T") => {
                 let time = NaiveTime::parse_from_str(v, "%H%M%S")
-                    .map_err(|_| Self::invalid_tag(tag))?;
+                    .map_err(|_| self.invalid_tag(buffer, tag, tag_begin))?;
                 Ok(Datum::Time(time))
             }
             _ => Ok(Datum::String(v.to_string())),
         }
     }
 
-    fn as_str<'a>(data: &'a [u8], tag: &[u8]) -> Result<&'a str, Error> {
-        str::from_utf8(data).map_err(|_| Self::invalid_tag(tag))
+    fn as_str<'a>(
+        &self, buffer: &[u8], data: &'a [u8], tag: &[u8], tag_begin: usize,
+    ) -> Result<&'a str, Error> {
+        str::from_utf8(data)
+            .map_err(|_| self.invalid_tag(buffer, tag, tag_begin))
     }
 
     fn parse_value<'a>(
-        src: &'a BytesMut, offset: usize, tag: &'a [u8],
+        &self, src: &'a BytesMut, offset: usize, tag: &'a [u8],
+        tag_begin: usize,
     ) -> Result<Option<(&'a str, Datum, usize)>, Error> {
-        let err = || Self::invalid_tag(tag);
+        let err = || self.invalid_tag(src, tag, tag_begin);
 
         let mut parts = tag.split(|&b| b == b':');
         let (name, len, typ) =
@@ -108,10 +158,12 @@ impl TagDecoder {
                 _ => return Err(err()),
             };
 
-        let name = Self::as_str(name, tag)?;
-        let len = Self::as_str(len, tag)?;
+        let name = self.as_str(src, name, tag, tag_begin)?;
+        let len = self.as_str(src, len, tag, tag_begin)?;
         let len = len.parse::<usize>().map_err(|_| err())?;
-        let typ = typ.map(|t| Self::as_str(t, tag)).transpose()?;
+        let typ = typ
+            .map(|t| self.as_str(src, t, tag, tag_begin))
+            .transpose()?;
 
         let (begin, end) = (offset + 1, offset + 1 + len);
         if end > src.len() {
@@ -119,8 +171,8 @@ impl TagDecoder {
         }
 
         let value = &src[begin..end];
-        let value = Self::as_str(value, tag)?;
-        let value = Self::parse_typed_value(tag, value, typ)?;
+        let value = self.as_str(src, value, tag, tag_begin)?;
+        let value = self.parse_typed_value(src, tag, value, typ, tag_begin)?;
 
         Ok(Some((name, value, end)))
     }
@@ -129,7 +181,6 @@ impl TagDecoder {
         &mut self, src: &mut BytesMut,
     ) -> Result<Option<ParserTag>, Error> {
         let Some(begin) = src.iter().position(|&b| b == b'<') else {
-            src.clear();
             return Ok(None);
         };
         let remainder = &src[begin..];
@@ -141,21 +192,27 @@ impl TagDecoder {
         let tag = &src[begin..end];
 
         if tag.eq_ignore_ascii_case(b"eoh") {
-            src.advance(end + 1);
+            let n = end + 1;
+            self.advance(src, n);
             return Ok(Some(ParserTag::Eoh));
         } else if tag.eq_ignore_ascii_case(b"eor") {
-            src.advance(end + 1);
+            let n = end + 1;
+            self.advance(src, n);
             return Ok(Some(ParserTag::Eor));
         } else if tag.eq_ignore_ascii_case(b"app_lotw_eof") {
-            src.clear();
+            // ignore rest regardless of eof handling mode
+            let n = src.len();
+            self.advance(src, n);
             return Ok(Some(ParserTag::Eof));
         }
 
-        let Some((name, value, end)) = Self::parse_value(src, end, tag)? else {
+        let Some((name, value, end)) =
+            self.parse_value(src, end, tag, begin - 1)?
+        else {
             return Ok(None);
         };
         let tag = ParserTag::Field(Field::new(name, value));
-        src.advance(end);
+        self.advance(src, end);
 
         Ok(Some(tag))
     }
@@ -170,20 +227,18 @@ impl TagDecoder {
             (None, true, true) => return Ok(None), // at eof, nothing left
             (None, true, false) => {
                 // at eof and eof handling was requested
-                return Err(Error::InvalidFormat(Cow::Borrowed(
-                    "partial data at end of stream",
-                )));
+                let (line, column, byte) = self.calculate_position(src, 0);
+                return Err(Error::InvalidFormat {
+                    message: Cow::Borrowed("partial data at end of stream"),
+                    position: Position { line, column, byte },
+                });
             }
         };
         let tag = match tag {
             ParserTag::Field(field) => Some(Tag::Field(field)),
             ParserTag::Eoh => Some(Tag::Eoh),
             ParserTag::Eor => Some(Tag::Eor),
-            ParserTag::Eof => {
-                // ignore rest regardless of eof handling mode
-                src.clear();
-                None
-            }
+            ParserTag::Eof => None,
         };
         Ok(tag)
     }

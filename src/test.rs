@@ -1,8 +1,18 @@
 use chrono::{NaiveDate, NaiveTime};
 use rust_decimal::Decimal;
+use std::borrow::Cow;
 use std::io;
 
 use super::*;
+
+pub(crate) fn invalid_format(
+    message: &'static str, line: usize, column: usize, byte: usize,
+) -> Error {
+    Error::InvalidFormat {
+        message: Cow::Borrowed(message),
+        position: Position { line, column, byte },
+    }
+}
 
 pub(crate) fn duplicate_key(key: &str, record: Record) -> Error {
     Error::DuplicateKey {
@@ -144,7 +154,17 @@ fn error_eq_io_errors() {
 
     assert_eq!(e1, e2);
     assert_ne!(e1, e3);
-    assert_ne!(e1, Error::InvalidFormat(Cow::Borrowed("msg")));
+    assert_ne!(e1, invalid_format("msg", 1, 1, 0));
+}
+
+#[test]
+fn position_display() {
+    let pos = Position {
+        line: 5,
+        column: 12,
+        byte: 42,
+    };
+    assert_eq!(pos.to_string(), "line 5, column 12 (byte 42)");
 }
 
 #[test]

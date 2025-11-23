@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
 use super::*;
-use crate::test::duplicate_key;
+use crate::test::{duplicate_key, invalid_format};
 use crate::{Datum, Error, Field, Record, Tag};
 
 fn tags(s: &str) -> TagStream<&[u8]> {
@@ -232,9 +232,7 @@ async fn partial_tag_error() {
         let err = f.next().await.unwrap().unwrap_err();
         assert_eq!(
             err,
-            Error::InvalidFormat(Cow::Borrowed(
-                "partial data at end of stream"
-            ))
+            invalid_format("partial data at end of stream", 1, 1, 0)
         );
     }
 }
@@ -322,7 +320,7 @@ async fn trickle_invalid() {
     let reader = TrickleReader::new("<foo:3:n>abc", 1);
     let mut f = TagDecoder::new_stream(reader, true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(err, Error::InvalidFormat(Cow::Owned("foo:3:n".to_string())));
+    assert_eq!(err, invalid_format("foo:3:n", 1, 1, 0));
 }
 
 struct TrickleStream<S> {
@@ -414,7 +412,7 @@ async fn partial_record_error() {
     let err = f.next().await.unwrap().unwrap_err();
     assert_eq!(
         err,
-        Error::InvalidFormat(Cow::Borrowed("partial data at end of stream"))
+        invalid_format("partial data at end of stream", 1, 1, 0)
     );
 }
 
@@ -430,14 +428,14 @@ async fn record_stream() {
 async fn no_length() {
     let mut f = RecordStream::new("<call>W1AW<eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(err, Error::InvalidFormat(Cow::Borrowed("call")));
+    assert_eq!(err, invalid_format("call", 1, 1, 0));
 }
 
 #[tokio::test]
 async fn too_many() {
     let mut f = RecordStream::new("<call:4:s:xxx>W1AW<eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(err, Error::InvalidFormat(Cow::Borrowed("call:4:s:xxx")));
+    assert_eq!(err, invalid_format("call:4:s:xxx", 1, 1, 0));
 }
 
 #[tokio::test]
@@ -535,34 +533,28 @@ async fn boolean_n() {
 async fn invalid_boolean() {
     let mut f = RecordStream::new("<qsl:1:b>X<eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(err, Error::InvalidFormat(Cow::Owned("qsl:1:b".to_string())));
+    assert_eq!(err, invalid_format("qsl:1:b", 1, 1, 0));
 }
 
 #[tokio::test]
 async fn invalid_number() {
     let mut f = tags("<foo:3:n>abc");
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(err, Error::InvalidFormat(Cow::Owned("foo:3:n".to_string())));
+    assert_eq!(err, invalid_format("foo:3:n", 1, 1, 0));
 }
 
 #[tokio::test]
 async fn invalid_date() {
     let mut f = tags("<qso_date:8:d>notadate");
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        Error::InvalidFormat(Cow::Owned("qso_date:8:d".to_string()))
-    );
+    assert_eq!(err, invalid_format("qso_date:8:d", 1, 1, 0));
 }
 
 #[tokio::test]
 async fn invalid_time() {
     let mut f = tags("<time_on:6:t>notime");
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        Error::InvalidFormat(Cow::Owned("time_on:6:t".to_string()))
-    );
+    assert_eq!(err, invalid_format("time_on:6:t", 1, 1, 0));
 }
 
 #[tokio::test]
@@ -649,14 +641,14 @@ async fn empty_field() {
 async fn field_missing_length() {
     let mut f = RecordStream::new("<call:><eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(err, Error::InvalidFormat(Cow::Borrowed("call:")));
+    assert_eq!(err, invalid_format("call:", 1, 1, 0));
 }
 
 #[tokio::test]
 async fn field_negative_length() {
     let mut f = RecordStream::new("<call:-1><eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(err, Error::InvalidFormat(Cow::Borrowed("call:-1")));
+    assert_eq!(err, invalid_format("call:-1", 1, 1, 0));
 }
 
 #[tokio::test]
@@ -672,7 +664,7 @@ async fn invalid_utf8_in_field_value() {
     let bytes = b"<foo:2>\xFF\xFE<eor>";
     let mut f = RecordStream::new(bytes as &[u8], true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(err, Error::InvalidFormat(Cow::Owned("foo:2".to_string())));
+    assert_eq!(err, invalid_format("foo:2", 1, 1, 0));
 }
 
 #[tokio::test]
@@ -680,10 +672,7 @@ async fn invalid_utf8_in_tag_name() {
     let bytes = b"<\xFF\xFE:3>val<eor>";
     let mut f = RecordStream::new(bytes as &[u8], true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        Error::InvalidFormat(Cow::Owned("\u{FFFD}\u{FFFD}:3".to_string()))
-    );
+    assert_eq!(err, invalid_format("\u{FFFD}\u{FFFD}:3", 1, 1, 0));
 }
 
 #[tokio::test]
@@ -691,10 +680,7 @@ async fn invalid_utf8_in_tag_len() {
     let bytes = b"<foo:\xFF>val<eor>";
     let mut f = RecordStream::new(bytes as &[u8], true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        Error::InvalidFormat(Cow::Owned("foo:\u{FFFD}".to_string()))
-    );
+    assert_eq!(err, invalid_format("foo:\u{FFFD}", 1, 1, 0));
 }
 
 #[tokio::test]
@@ -702,10 +688,7 @@ async fn invalid_utf8_in_type_spec() {
     let bytes = b"<foo:3:\xFF>val<eor>";
     let mut f = RecordStream::new(bytes as &[u8], true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        Error::InvalidFormat(Cow::Owned("foo:3:\u{FFFD}".to_string()))
-    );
+    assert_eq!(err, invalid_format("foo:3:\u{FFFD}", 1, 1, 0));
 }
 
 #[tokio::test]
@@ -716,4 +699,40 @@ async fn duplicate_field() {
     let mut r = Record::new();
     r.insert("call", "W1AW").unwrap();
     assert_eq!(err, duplicate_key("call", r));
+}
+
+#[tokio::test]
+async fn trailing_data_ignored() {
+    let mut f = RecordStream::new("<call:4>W1AW<eor> ".as_bytes(), true);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
+    no_records(&mut f).await;
+}
+
+#[tokio::test]
+async fn trailing_data_error() {
+    let mut f = RecordStream::new("<call:4>W1AW<eor> ".as_bytes(), false);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        invalid_format("partial data at end of stream", 1, 18, 17)
+    );
+}
+
+#[tokio::test]
+async fn err_pos_skips_spaces() {
+    let bytes = b"<foo:2>aa <bar:2>\xFF\xFE<eor>";
+    let mut f = RecordStream::new(bytes as &[u8], true);
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(err, invalid_format("bar:2", 1, 11, 10));
+}
+
+#[tokio::test]
+async fn err_pos_skips_newlines() {
+    let bytes = b"<foo:2>aa\n<bar:2>\xFF\xFE<eor>";
+    let mut f = RecordStream::new(bytes as &[u8], true);
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(err, invalid_format("bar:2", 2, 1, 10));
 }

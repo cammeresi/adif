@@ -1,8 +1,9 @@
-use super::*;
-use crate::parse::{RecordStream, TagStream};
-use crate::test::invalid_format;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use futures::StreamExt;
+
+use super::*;
+use crate::parse::{RecordStream, TagStream};
+use crate::test::helpers::*;
 
 fn dt(
     year: i32, month: u32, day: u32, hour: u32, min: u32, sec: u32,
@@ -318,10 +319,7 @@ async fn normalize_error_passthrough() {
     let rec = next(&mut normalized).await;
     assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let err = normalized.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        invalid_format("partial data at end of stream", 1, 18, 17)
-    );
+    assert_eq!(err, partial_data(1, 18, 17));
 }
 
 #[tokio::test]
@@ -331,10 +329,7 @@ async fn filter_error_passthrough() {
     let rec = next(&mut filtered).await;
     assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let err = filtered.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        invalid_format("partial data at end of stream", 1, 18, 17)
-    );
+    assert_eq!(err, partial_data(1, 18, 17));
 }
 
 #[tokio::test]

@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
 use super::*;
-use crate::test::{duplicate_key, invalid_format};
+use crate::test::helpers::*;
 use crate::{Datum, Error, Field, Record, Tag};
 
 fn tags(s: &str) -> TagStream<&[u8]> {
@@ -230,10 +230,7 @@ async fn partial_tag_error() {
     for i in 0..s.len() {
         let mut f = TagDecoder::new_stream(&s.as_bytes()[..=i], false);
         let err = f.next().await.unwrap().unwrap_err();
-        assert_eq!(
-            err,
-            invalid_format("partial data at end of stream", 1, 1, 0)
-        );
+        assert_eq!(err, partial_data(1, 1, 0));
     }
 }
 
@@ -410,10 +407,7 @@ async fn partial_record_ignore() {
 async fn partial_record_error() {
     let mut f = RecordStream::new("<call:4>W1A".as_bytes(), false);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        invalid_format("partial data at end of stream", 1, 1, 0)
-    );
+    assert_eq!(err, partial_data(1, 1, 0));
 }
 
 #[tokio::test]
@@ -715,10 +709,7 @@ async fn trailing_data_error() {
     let rec = next_record(&mut f, false).await;
     assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        invalid_format("partial data at end of stream", 1, 18, 17)
-    );
+    assert_eq!(err, partial_data(1, 18, 17));
 }
 
 #[tokio::test]

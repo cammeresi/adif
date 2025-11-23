@@ -5,7 +5,7 @@ use futures::{SinkExt, StreamExt};
 use rust_decimal::Decimal;
 
 use super::{RecordSink, TagEncoder, TagSinkExt};
-use crate::test::cannot_output;
+use crate::test::helpers::*;
 use crate::{Datum, Field, OutputTypes, Record, RecordStream, Tag};
 
 #[tokio::test]

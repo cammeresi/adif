@@ -8,7 +8,8 @@ use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
 use super::*;
-use crate::{Datum, Error, Field, Tag};
+use crate::test::duplicate_key;
+use crate::{Datum, Error, Field, Record, Tag};
 
 fn tags(s: &str) -> TagStream<&[u8]> {
     TagDecoder::new_stream(s.as_bytes(), true)
@@ -712,8 +713,7 @@ async fn duplicate_field() {
     let mut f =
         RecordStream::new("<call:4>W1AW<call:5>AB9BH<eor>".as_bytes(), true);
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(
-        err,
-        Error::InvalidFormat(Cow::Owned("duplicate key: call".to_string()))
-    );
+    let mut r = Record::new();
+    r.insert("call", "W1AW").unwrap();
+    assert_eq!(err, duplicate_key("call", r));
 }

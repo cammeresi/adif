@@ -40,6 +40,14 @@ pub enum Error {
     /// keys in records.
     #[error("Invalid ADIF format: {0}")]
     InvalidFormat(Cow<'static, str>),
+    /// Duplicate key encountered in a record.
+    #[error("Duplicate key in record: {key}")]
+    DuplicateKey {
+        /// Duplicate key name
+        key: String,
+        /// Record containing the duplicate
+        record: Record,
+    },
 }
 
 impl PartialEq for Error {
@@ -47,6 +55,16 @@ impl PartialEq for Error {
         match (self, other) {
             (Error::Io(a), Error::Io(b)) => a.kind() == b.kind(),
             (Error::InvalidFormat(a), Error::InvalidFormat(b)) => a == b,
+            (
+                Error::DuplicateKey {
+                    key: ka,
+                    record: ra,
+                },
+                Error::DuplicateKey {
+                    key: kb,
+                    record: rb,
+                },
+            ) => ka == kb && ra == rb,
             _ => false,
         }
     }
@@ -365,9 +383,10 @@ impl Record {
     {
         let name = name.into();
         match self.fields.entry(name) {
-            Entry::Occupied(e) => Err(Error::InvalidFormat(Cow::Owned(
-                format!("duplicate key: {}", e.key()),
-            ))),
+            Entry::Occupied(e) => Err(Error::DuplicateKey {
+                key: e.key().to_string(),
+                record: self.clone(),
+            }),
             Entry::Vacant(e) => {
                 e.insert(value.into());
                 Ok(())

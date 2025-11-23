@@ -4,6 +4,13 @@ use std::io;
 
 use super::*;
 
+pub(crate) fn duplicate_key(key: &str, record: Record) -> Error {
+    Error::DuplicateKey {
+        key: key.to_string(),
+        record,
+    }
+}
+
 #[test]
 fn tag_as_field_returns_some_for_field() {
     let field = Field::new("call", "W1AW");

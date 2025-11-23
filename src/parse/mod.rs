@@ -69,29 +69,18 @@ impl TagDecoder {
         FramedRead::new(reader, decoder)
     }
 
-    fn calculate_position(
-        &self, buffer: &[u8], offset: usize,
-    ) -> (usize, usize, usize) {
-        let mut line = self.line;
-        let mut column = self.column;
-
-        for &byte in &buffer[..offset] {
-            if byte == b'\n' {
-                line += 1;
-                column = 1;
-            } else {
-                column += 1;
-            }
+    fn position(&self) -> Position {
+        Position {
+            line: self.line,
+            column: self.column,
+            byte: self.consumed,
         }
-
-        (line, column, self.consumed + offset)
     }
 
-    fn invalid_tag(&self, buffer: &[u8], tag: &[u8]) -> Error {
-        let (line, column, byte) = self.calculate_position(buffer, 0);
+    fn invalid_tag(&self, tag: &[u8]) -> Error {
         Error::InvalidFormat {
             message: Cow::Owned(String::from_utf8_lossy(tag).into_owned()),
-            position: Position { line, column, byte },
+            position: self.position(),
         }
     }
 
@@ -126,46 +115,44 @@ impl TagDecoder {
     }
 
     fn parse_typed_value(
-        &self, buffer: &[u8], tag: &[u8], v: &str, typ: Option<&str>,
+        &self, tag: &[u8], v: &str, typ: Option<&str>,
     ) -> Result<Datum, Error> {
         match typ {
             Some("n") | Some("N") => {
-                let num = Decimal::from_str(v)
-                    .map_err(|_| self.invalid_tag(buffer, tag))?;
+                let num =
+                    Decimal::from_str(v).map_err(|_| self.invalid_tag(tag))?;
                 Ok(Datum::Number(num))
             }
             Some("b") | Some("B") => {
                 let b = match v {
                     "Y" | "y" => true,
                     "N" | "n" => false,
-                    _ => return Err(self.invalid_tag(buffer, tag)),
+                    _ => return Err(self.invalid_tag(tag)),
                 };
                 Ok(Datum::Boolean(b))
             }
             Some("d") | Some("D") => {
                 let date = NaiveDate::parse_from_str(v, "%Y%m%d")
-                    .map_err(|_| self.invalid_tag(buffer, tag))?;
+                    .map_err(|_| self.invalid_tag(tag))?;
                 Ok(Datum::Date(date))
             }
             Some("t") | Some("T") => {
                 let time = NaiveTime::parse_from_str(v, "%H%M%S")
-                    .map_err(|_| self.invalid_tag(buffer, tag))?;
+                    .map_err(|_| self.invalid_tag(tag))?;
                 Ok(Datum::Time(time))
             }
             _ => Ok(Datum::String(v.to_string())),
         }
     }
 
-    fn as_str<'a>(
-        &self, buffer: &[u8], data: &'a [u8], tag: &[u8],
-    ) -> Result<&'a str, Error> {
-        str::from_utf8(data).map_err(|_| self.invalid_tag(buffer, tag))
+    fn as_str<'a>(&self, data: &'a [u8], tag: &[u8]) -> Result<&'a str, Error> {
+        str::from_utf8(data).map_err(|_| self.invalid_tag(tag))
     }
 
     fn parse_value<'a>(
         &self, src: &'a BytesMut, offset: usize, tag: &'a [u8],
     ) -> Result<Option<(&'a str, Datum, usize)>, Error> {
-        let err = || self.invalid_tag(src, tag);
+        let err = || self.invalid_tag(tag);
 
         let mut parts = tag.split(|&b| b == b':');
         let (name, len, typ) =
@@ -174,10 +161,10 @@ impl TagDecoder {
                 _ => return Err(err()),
             };
 
-        let name = self.as_str(src, name, tag)?;
-        let len = self.as_str(src, len, tag)?;
+        let name = self.as_str(name, tag)?;
+        let len = self.as_str(len, tag)?;
         let len = len.parse::<usize>().map_err(|_| err())?;
-        let typ = typ.map(|t| self.as_str(src, t, tag)).transpose()?;
+        let typ = typ.map(|t| self.as_str(t, tag)).transpose()?;
 
         let (begin, end) = (offset + 1, offset + 1 + len);
         if end > src.len() {
@@ -185,8 +172,8 @@ impl TagDecoder {
         }
 
         let value = &src[begin..end];
-        let value = self.as_str(src, value, tag)?;
-        let value = self.parse_typed_value(src, tag, value, typ)?;
+        let value = self.as_str(value, tag)?;
+        let value = self.parse_typed_value(tag, value, typ)?;
 
         Ok(Some((name, value, end)))
     }
@@ -237,10 +224,9 @@ impl TagDecoder {
             (None, true, true) => return Ok(None), // at eof, nothing left
             (None, true, false) => {
                 // at eof and eof handling was requested
-                let (line, column, byte) = self.calculate_position(src, 0);
                 return Err(Error::InvalidFormat {
                     message: Cow::Borrowed("partial data at end of stream"),
-                    position: Position { line, column, byte },
+                    position: self.position(),
                 });
             }
         };

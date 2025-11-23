@@ -102,6 +102,14 @@ These anomalies are probably small bits of code from the standard library
 that are inlined by the compiler and that are thus out of the control
 of this crate.
 
+> I reviewed your flight plan.  Not one error in a million keystrokes.
+> Phenomenal.  [[Gattaca, 1997][gattaca]]
+
+[gattaca]: https://en.wikipedia.org/wiki/Gattaca
+
+Additionally, each of the property-based tests has run over one million
+times without error.
+
 ## Author
 
 Sidney Cammeresi, AB9BH

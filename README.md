@@ -24,14 +24,14 @@ cargo add TBD
 
 Then start reading ADIF from any object that implements the AsyncRead trait:
 
-```rust,no_run
+```rust
 use adif::RecordStream;
 use futures::StreamExt;
 use tokio::{fs::File, io::BufReader};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file = File::open("foo.adif").await?;
+    let file = File::open("examples/sample.adif").await?;
     let reader = BufReader::new(file);
     let mut stream = RecordStream::new(reader, true);
     while let Some(result) = stream.next().await {

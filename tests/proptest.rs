@@ -1,4 +1,4 @@
-use adif::{Datum, OutputTypes, Record, RecordSink, RecordStream};
+use adif::{Datum, Error, OutputTypes, Record, RecordSink, RecordStream};
 use chrono::{Days, NaiveDate, NaiveTime};
 use futures::{SinkExt, StreamExt};
 use proptest::prelude::*;
@@ -164,6 +164,34 @@ async fn test_roundtrip_never(header: Record, records: Vec<Record>) {
     assert!(stream.next().await.is_none());
 }
 
+async fn test_truncation_error_position(records: Vec<Record>) {
+    let mut buf = Vec::new();
+    let mut sink = RecordSink::with_types(&mut buf, OutputTypes::Never);
+
+    for record in &records {
+        sink.send(record.clone()).await.unwrap();
+    }
+    sink.close().await.unwrap();
+
+    let pos = buf.len() * 3 / 4;
+    let truncated = &buf[..pos];
+    let mut stream = RecordStream::new(truncated, false);
+
+    loop {
+        match stream.next().await {
+            None => break,
+            Some(Ok(_)) => continue,
+            Some(Err(Error::InvalidFormat { position, .. })) => {
+                assert_eq!(buf.get(position.byte), Some(&b'<'));
+                break;
+            }
+            Some(Err(e)) => {
+                panic!("unexpected error: {}", e);
+            }
+        }
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
@@ -182,5 +210,12 @@ proptest! {
         records in prop::collection::vec(record_strategy(), 0..=20)
     ) {
         tokio_test::block_on(test_roundtrip_never(header, records));
+    }
+
+    #[test]
+    fn truncation_error_position(
+        records in prop::collection::vec(record_strategy(), 1..=2)
+    ) {
+        tokio_test::block_on(test_truncation_error_position(records));
     }
 }

@@ -41,6 +41,10 @@ impl TagDecoder {
     /// Tag names preserve their original case but are compared
     /// case-insensitively.
     ///
+    /// If `ignore_partial` is `true`, incomplete trailing data will be
+    /// silently ignored.  Set it to `false` to get an error in this
+    /// situation.  Either way, trailing whitespace is silently consumed
+    /// and will not return an error.
     /// ```
     /// # tokio_test::block_on(async {
     /// use adif::TagDecoder;
@@ -83,18 +87,16 @@ impl TagDecoder {
         (line, column, self.consumed + offset)
     }
 
-    fn invalid_tag(
-        &self, buffer: &[u8], tag: &[u8], tag_begin: usize,
-    ) -> Error {
-        let (line, column, byte) = self.calculate_position(buffer, tag_begin);
+    fn invalid_tag(&self, buffer: &[u8], tag: &[u8]) -> Error {
+        let (line, column, byte) = self.calculate_position(buffer, 0);
         Error::InvalidFormat {
             message: Cow::Owned(String::from_utf8_lossy(tag).into_owned()),
             position: Position { line, column, byte },
         }
     }
 
-    fn advance(&mut self, src: &mut BytesMut, consumed: usize) {
-        for &byte in &src[..consumed] {
+    fn advance_slice(&mut self, data: &[u8]) {
+        for &byte in data {
             if byte == b'\n' {
                 self.line += 1;
                 self.column = 1;
@@ -102,36 +104,52 @@ impl TagDecoder {
                 self.column += 1;
             }
         }
-        self.consumed += consumed;
+        self.consumed += data.len();
+    }
+
+    fn advance(
+        &mut self, src: &mut BytesMut, consumed: usize, skip_whitespace: bool,
+    ) {
+        self.advance_slice(&src[..consumed]);
         src.advance(consumed);
+
+        // skip whitespace after a tag so "...<eor>\n" isn't an error, even
+        // if ignore_partial is false
+        if skip_whitespace {
+            let whitespace = src
+                .iter()
+                .position(|&b| !b.is_ascii_whitespace())
+                .unwrap_or(src.len());
+            self.advance_slice(&src[..whitespace]);
+            src.advance(whitespace);
+        }
     }
 
     fn parse_typed_value(
         &self, buffer: &[u8], tag: &[u8], v: &str, typ: Option<&str>,
-        tag_begin: usize,
     ) -> Result<Datum, Error> {
         match typ {
             Some("n") | Some("N") => {
                 let num = Decimal::from_str(v)
-                    .map_err(|_| self.invalid_tag(buffer, tag, tag_begin))?;
+                    .map_err(|_| self.invalid_tag(buffer, tag))?;
                 Ok(Datum::Number(num))
             }
             Some("b") | Some("B") => {
                 let b = match v {
                     "Y" | "y" => true,
                     "N" | "n" => false,
-                    _ => return Err(self.invalid_tag(buffer, tag, tag_begin)),
+                    _ => return Err(self.invalid_tag(buffer, tag)),
                 };
                 Ok(Datum::Boolean(b))
             }
             Some("d") | Some("D") => {
                 let date = NaiveDate::parse_from_str(v, "%Y%m%d")
-                    .map_err(|_| self.invalid_tag(buffer, tag, tag_begin))?;
+                    .map_err(|_| self.invalid_tag(buffer, tag))?;
                 Ok(Datum::Date(date))
             }
             Some("t") | Some("T") => {
                 let time = NaiveTime::parse_from_str(v, "%H%M%S")
-                    .map_err(|_| self.invalid_tag(buffer, tag, tag_begin))?;
+                    .map_err(|_| self.invalid_tag(buffer, tag))?;
                 Ok(Datum::Time(time))
             }
             _ => Ok(Datum::String(v.to_string())),
@@ -139,17 +157,15 @@ impl TagDecoder {
     }
 
     fn as_str<'a>(
-        &self, buffer: &[u8], data: &'a [u8], tag: &[u8], tag_begin: usize,
+        &self, buffer: &[u8], data: &'a [u8], tag: &[u8],
     ) -> Result<&'a str, Error> {
-        str::from_utf8(data)
-            .map_err(|_| self.invalid_tag(buffer, tag, tag_begin))
+        str::from_utf8(data).map_err(|_| self.invalid_tag(buffer, tag))
     }
 
     fn parse_value<'a>(
         &self, src: &'a BytesMut, offset: usize, tag: &'a [u8],
-        tag_begin: usize,
     ) -> Result<Option<(&'a str, Datum, usize)>, Error> {
-        let err = || self.invalid_tag(src, tag, tag_begin);
+        let err = || self.invalid_tag(src, tag);
 
         let mut parts = tag.split(|&b| b == b':');
         let (name, len, typ) =
@@ -158,12 +174,10 @@ impl TagDecoder {
                 _ => return Err(err()),
             };
 
-        let name = self.as_str(src, name, tag, tag_begin)?;
-        let len = self.as_str(src, len, tag, tag_begin)?;
+        let name = self.as_str(src, name, tag)?;
+        let len = self.as_str(src, len, tag)?;
         let len = len.parse::<usize>().map_err(|_| err())?;
-        let typ = typ
-            .map(|t| self.as_str(src, t, tag, tag_begin))
-            .transpose()?;
+        let typ = typ.map(|t| self.as_str(src, t, tag)).transpose()?;
 
         let (begin, end) = (offset + 1, offset + 1 + len);
         if end > src.len() {
@@ -171,8 +185,8 @@ impl TagDecoder {
         }
 
         let value = &src[begin..end];
-        let value = self.as_str(src, value, tag, tag_begin)?;
-        let value = self.parse_typed_value(src, tag, value, typ, tag_begin)?;
+        let value = self.as_str(src, value, tag)?;
+        let value = self.parse_typed_value(src, tag, value, typ)?;
 
         Ok(Some((name, value, end)))
     }
@@ -183,36 +197,32 @@ impl TagDecoder {
         let Some(begin) = src.iter().position(|&b| b == b'<') else {
             return Ok(None);
         };
-        let remainder = &src[begin..];
-        let Some(end) = remainder.iter().position(|&b| b == b'>') else {
+        self.advance(src, begin, false);
+        let Some(end) = src.iter().position(|&b| b == b'>') else {
             return Ok(None);
         };
-
-        let (begin, end) = (begin + 1, begin + end);
-        let tag = &src[begin..end];
+        let tag = &src[1..end];
 
         if tag.eq_ignore_ascii_case(b"eoh") {
             let n = end + 1;
-            self.advance(src, n);
+            self.advance(src, n, true);
             return Ok(Some(ParserTag::Eoh));
         } else if tag.eq_ignore_ascii_case(b"eor") {
             let n = end + 1;
-            self.advance(src, n);
+            self.advance(src, n, true);
             return Ok(Some(ParserTag::Eor));
         } else if tag.eq_ignore_ascii_case(b"app_lotw_eof") {
             // ignore rest regardless of eof handling mode
             let n = src.len();
-            self.advance(src, n);
+            self.advance(src, n, true);
             return Ok(Some(ParserTag::Eof));
         }
 
-        let Some((name, value, end)) =
-            self.parse_value(src, end, tag, begin - 1)?
-        else {
+        let Some((name, value, end)) = self.parse_value(src, end, tag)? else {
             return Ok(None);
         };
         let tag = ParserTag::Field(Field::new(name, value));
-        self.advance(src, end);
+        self.advance(src, end, true);
 
         Ok(Some(tag))
     }
@@ -299,6 +309,11 @@ where
     ///
     /// Tag names preserve their original case but are compared
     /// case-insensitively.
+    ///
+    /// If `ignore_partial` is `true`, incomplete trailing data will be
+    /// silently ignored.  Set it to `false` to get an error in this
+    /// situation.  Either way, trailing whitespace is silently consumed
+    /// and will not return an error.
     /// ```
     /// # tokio_test::block_on(async {
     /// use adif::RecordStream;

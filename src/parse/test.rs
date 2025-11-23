@@ -704,12 +704,20 @@ async fn trailing_data_ignored() {
 }
 
 #[tokio::test]
-async fn trailing_data_error() {
+async fn trailing_whitespace_always_ignored() {
     let mut f = RecordStream::new("<call:4>W1AW<eor> ".as_bytes(), false);
     let rec = next_record(&mut f, false).await;
     assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
+    no_records(&mut f).await;
+}
+
+#[tokio::test]
+async fn trailing_data_error() {
+    let mut f = RecordStream::new("<call:4>W1AW<eor> aaa".as_bytes(), false);
+    let rec = next_record(&mut f, false).await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let err = f.next().await.unwrap().unwrap_err();
-    assert_eq!(err, partial_data(1, 18, 17));
+    assert_eq!(err, partial_data(1, 19, 18));
 }
 
 #[tokio::test]
@@ -726,4 +734,12 @@ async fn err_pos_skips_newlines() {
     let mut f = RecordStream::new(bytes as &[u8], true);
     let err = f.next().await.unwrap().unwrap_err();
     assert_eq!(err, invalid_format("bar:2", 2, 1, 10));
+}
+
+#[tokio::test]
+async fn err_pos_skips_spaces_at_end() {
+    let bytes = b"<foo:2>aa <bar:2>";
+    let mut f = RecordStream::new(bytes as &[u8], false);
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(err, partial_data(1, 11, 10));
 }

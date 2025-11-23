@@ -96,22 +96,9 @@ impl TagDecoder {
         self.consumed += data.len();
     }
 
-    fn advance(
-        &mut self, src: &mut BytesMut, consumed: usize, skip_whitespace: bool,
-    ) {
+    fn advance(&mut self, src: &mut BytesMut, consumed: usize) {
         self.advance_slice(&src[..consumed]);
         src.advance(consumed);
-
-        // skip whitespace after a tag so "...<eor>\n" isn't an error, even
-        // if ignore_partial is false
-        if skip_whitespace {
-            let whitespace = src
-                .iter()
-                .position(|&b| !b.is_ascii_whitespace())
-                .unwrap_or(src.len());
-            self.advance_slice(&src[..whitespace]);
-            src.advance(whitespace);
-        }
     }
 
     fn parse_typed_value(
@@ -181,10 +168,25 @@ impl TagDecoder {
     fn decode_inner(
         &mut self, src: &mut BytesMut,
     ) -> Result<Option<ParserTag>, Error> {
+        // skip whitespace so "...<eor>\n" isn't an error, even if
+        // ignore_partial is false.  we can't skip inter-tag whitespace at
+        // the end of processing the previous tag because those bytes may
+        // not have arrived yet, and there may be no further tag.
+        let whitespace = src
+            .iter()
+            .position(|&b| !b.is_ascii_whitespace())
+            .unwrap_or(src.len());
+        self.advance_slice(&src[..whitespace]);
+        src.advance(whitespace);
+
+        // move up to next tag.  although we try to always stop at the next
+        // tag, this could be skipping leading text the first time through,
+        // or maybe we didn't have the start of the tag in the buffer last
+        // time.
         let Some(begin) = src.iter().position(|&b| b == b'<') else {
             return Ok(None);
         };
-        self.advance(src, begin, false);
+        self.advance(src, begin);
         let Some(end) = src.iter().position(|&b| b == b'>') else {
             return Ok(None);
         };
@@ -192,16 +194,16 @@ impl TagDecoder {
 
         if tag.eq_ignore_ascii_case(b"eoh") {
             let n = end + 1;
-            self.advance(src, n, true);
+            self.advance(src, n);
             return Ok(Some(ParserTag::Eoh));
         } else if tag.eq_ignore_ascii_case(b"eor") {
             let n = end + 1;
-            self.advance(src, n, true);
+            self.advance(src, n);
             return Ok(Some(ParserTag::Eor));
         } else if tag.eq_ignore_ascii_case(b"app_lotw_eof") {
             // ignore rest regardless of eof handling mode
             let n = src.len();
-            self.advance(src, n, true);
+            self.advance(src, n);
             return Ok(Some(ParserTag::Eof));
         }
 
@@ -209,7 +211,7 @@ impl TagDecoder {
             return Ok(None);
         };
         let tag = ParserTag::Field(Field::new(name, value));
-        self.advance(src, end, true);
+        self.advance(src, end);
 
         Ok(Some(tag))
     }

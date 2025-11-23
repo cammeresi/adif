@@ -287,8 +287,8 @@ impl AsyncRead for TrickleReader {
 
 async fn try_trickle_tags(chunk: usize) {
     let reader =
-        TrickleReader::new("Foo <bar:3>baz <qux:5:n>12345 <eoh>", chunk);
-    let mut f = TagDecoder::new_stream(reader, true);
+        TrickleReader::new("Foo <bar:3>baz <qux:5:n>12345 <eoh>   ", chunk);
+    let mut f = TagDecoder::new_stream(reader, false);
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "bar");

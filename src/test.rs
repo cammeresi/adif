@@ -11,6 +11,10 @@ pub(crate) fn duplicate_key(key: &str, record: Record) -> Error {
     }
 }
 
+pub(crate) fn cannot_output(typ: &'static str, reason: &'static str) -> Error {
+    Error::CannotOutput { typ, reason }
+}
+
 #[test]
 fn tag_as_field_returns_some_for_field() {
     let field = Field::new("call", "W1AW");

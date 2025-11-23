@@ -48,6 +48,14 @@ pub enum Error {
         /// Record containing the duplicate
         record: Record,
     },
+    /// Value cannot be output in ADIF format.
+    #[error("Cannot output {typ}: {reason}")]
+    CannotOutput {
+        /// Type of datum that cannot be output
+        typ: &'static str,
+        /// Reason why it cannot be output
+        reason: &'static str,
+    },
 }
 
 impl PartialEq for Error {
@@ -65,6 +73,16 @@ impl PartialEq for Error {
                     record: rb,
                 },
             ) => ka == kb && ra == rb,
+            (
+                Error::CannotOutput {
+                    typ: ta,
+                    reason: ra,
+                },
+                Error::CannotOutput {
+                    typ: tb,
+                    reason: rb,
+                },
+            ) => ta == tb && ra == rb,
             _ => false,
         }
     }

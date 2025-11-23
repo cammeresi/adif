@@ -3,7 +3,6 @@
 use crate::{Datum, Error, Record, Tag};
 use bytes::{BufMut, BytesMut};
 use futures::sink::Sink;
-use std::borrow::Cow;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncWrite;
@@ -91,12 +90,10 @@ impl TagEncoder {
         &self, datum: &Datum,
     ) -> Result<Option<&'static str>, Error> {
         match (self.types, datum) {
-            (_, Datum::DateTime(_)) => {
-                Err(Error::InvalidFormat(Cow::Borrowed(
-                    "DateTime cannot be output directly; split into date \
-                     and time fields",
-                )))
-            }
+            (_, Datum::DateTime(_)) => Err(Error::CannotOutput {
+                typ: "DateTime",
+                reason: "split into date and time fields",
+            }),
             (OutputTypes::Never, _) => Ok(None),
             (_, Datum::Boolean(_)) => Ok(Some("b")),
             (_, Datum::Number(_)) => Ok(Some("n")),

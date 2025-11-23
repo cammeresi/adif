@@ -5,6 +5,7 @@ use futures::{SinkExt, StreamExt};
 use rust_decimal::Decimal;
 
 use super::{RecordSink, TagEncoder, TagSinkExt};
+use crate::test::cannot_output;
 use crate::{Datum, Field, OutputTypes, Record, RecordStream, Tag};
 
 #[tokio::test]
@@ -123,8 +124,11 @@ async fn datetime_errors() {
     );
     let mut buf = Vec::new();
     let mut sink = TagEncoder::new().tag_sink_with(&mut buf);
-    let result = sink.send(Tag::Field(field)).await;
-    assert!(result.is_err());
+    let err = sink.send(Tag::Field(field)).await.unwrap_err();
+    assert_eq!(
+        err,
+        cannot_output("DateTime", "split into date and time fields")
+    );
 }
 
 #[tokio::test]
@@ -138,8 +142,11 @@ async fn encode_datetime_field_fails() {
     let mut buf = Vec::new();
     let mut sink =
         TagEncoder::with_types(OutputTypes::Always).tag_sink_with(&mut buf);
-    let result = sink.send(Tag::Field(field)).await;
-    assert!(result.is_err());
+    let err = sink.send(Tag::Field(field)).await.unwrap_err();
+    assert_eq!(
+        err,
+        cannot_output("DateTime", "split into date and time fields")
+    );
 }
 
 #[tokio::test]
@@ -266,6 +273,9 @@ async fn encode_datetime_record_fails() {
 
     let mut buf = Vec::new();
     let mut sink = RecordSink::with_types(&mut buf, OutputTypes::Always);
-    let result = sink.send(record).await;
-    assert!(result.is_err());
+    let err = sink.send(record).await.unwrap_err();
+    assert_eq!(
+        err,
+        cannot_output("DateTime", "split into date and time fields")
+    );
 }

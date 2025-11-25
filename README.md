@@ -98,7 +98,7 @@ verified by both `cargo llvm-cov` and codecov.io (badge at top).
 The report from `cargo llvm-cov` contains a few exceptions in its summary
 data only (5 out of over 3900 regions), but it does not positively
 identify any expression in this crate that is not executed by a test.
-These anomalies are probably small bits of code from the standard library
+These anomalies may be small bits of code from the standard library
 that are inlined by the compiler and that are thus out of the control
 of this crate.
 

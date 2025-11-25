@@ -4,41 +4,9 @@ use chrono::{NaiveDate, NaiveTime};
 use rust_decimal::Decimal;
 
 use super::*;
+
+pub(crate) mod helpers;
 use helpers::*;
-
-pub(crate) mod helpers {
-    use std::borrow::Cow;
-
-    use super::*;
-
-    pub(crate) fn invalid_format(
-        message: &'static str, line: usize, column: usize, byte: usize,
-    ) -> Error {
-        Error::InvalidFormat {
-            message: Cow::Borrowed(message),
-            position: Position { line, column, byte },
-        }
-    }
-
-    pub(crate) fn partial_data(
-        line: usize, column: usize, byte: usize,
-    ) -> Error {
-        invalid_format("partial data at end of stream", line, column, byte)
-    }
-
-    pub(crate) fn duplicate_key(key: &str, record: Record) -> Error {
-        Error::DuplicateKey {
-            key: key.to_string(),
-            record,
-        }
-    }
-
-    pub(crate) fn cannot_output(
-        typ: &'static str, reason: &'static str,
-    ) -> Error {
-        Error::CannotOutput { typ, reason }
-    }
-}
 
 #[test]
 fn tag_as_field_returns_some_for_field() {

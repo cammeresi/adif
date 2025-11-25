@@ -330,9 +330,8 @@ where
             match Pin::new(&mut self.stream).poll_next(cx) {
                 Poll::Ready(Some(Ok(Tag::Eoh))) => return self.make(true),
                 Poll::Ready(Some(Ok(Tag::Eor))) => return self.make(false),
-                Poll::Ready(Some(Ok(Tag::Field(field)))) => {
-                    if let Err(e) = self.record.insert(field.name, field.value)
-                    {
+                Poll::Ready(Some(Ok(Tag::Field(f)))) => {
+                    if let Err(e) = self.record.insert(f.name, f.value) {
                         return Poll::Ready(Some(Err(e)));
                     }
                 }

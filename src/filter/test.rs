@@ -128,6 +128,20 @@ async fn normalize_band_no_band() {
 }
 
 #[tokio::test]
+async fn trickle_normalize_band() {
+    let stream =
+        RecordStream::new("<band:3>20m<eor><band:3>40M<eor>".as_bytes(), true);
+    let trickled = TrickleStream::new(stream);
+    let mut normalized = normalize_band(trickled);
+
+    let rec = next(&mut normalized).await;
+    assert_eq!(rec.get(":band").unwrap().as_str(), "20M");
+
+    let rec = next(&mut normalized).await;
+    assert_eq!(rec.get(":band").unwrap().as_str(), "40M");
+}
+
+#[tokio::test]
 async fn normalize_times_typed() {
     let record =
         parse_norm_times("<qso_date:8:d>20231215<time_on:6:t>143000<eor>")
@@ -281,6 +295,20 @@ async fn exclude_callsigns_missing_call() {
     let mut filtered = exclude_callsigns(stream, &["W1AW"]);
     let rec = next(&mut filtered).await;
     assert!(rec.get("call").is_none());
+    assert!(filtered.next().await.is_none());
+}
+
+#[tokio::test]
+async fn trickle_exclude_callsigns() {
+    let stream = RecordStream::new(
+        "<call:4>W1AW<eor><call:5>AB9BH<eor><call:4>W6RQ<eor>".as_bytes(),
+        true,
+    );
+    let trickled = TrickleStream::new(stream);
+    let mut filtered = exclude_callsigns(trickled, &["W1AW", "W6RQ"]);
+
+    let rec = next(&mut filtered).await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "AB9BH");
     assert!(filtered.next().await.is_none());
 }
 

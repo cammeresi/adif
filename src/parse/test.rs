@@ -1,11 +1,7 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use futures::{Stream, StreamExt};
+use futures::StreamExt;
 use rust_decimal::Decimal;
-use std::io;
-use std::pin::Pin;
 use std::str::FromStr;
-use std::task::{Context, Poll};
-use tokio::io::AsyncRead;
 
 use super::*;
 use crate::test::helpers::*;
@@ -243,48 +239,6 @@ async fn complete_tag_no_error() {
     no_tags(&mut f).await;
 }
 
-struct TrickleReader {
-    data: Vec<u8>,
-    pos: usize,
-    chunk: usize,
-    delayed: bool,
-}
-
-impl TrickleReader {
-    fn new(data: &str, chunk: usize) -> Self {
-        Self {
-            data: data.as_bytes().to_vec(),
-            pos: 0,
-            chunk,
-            delayed: false,
-        }
-    }
-}
-
-impl AsyncRead for TrickleReader {
-    fn poll_read(
-        mut self: Pin<&mut Self>, cx: &mut Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        let remaining = self.data.len() - self.pos;
-        if remaining == 0 {
-            return Poll::Ready(Ok(()));
-        }
-
-        if !self.delayed {
-            self.delayed = true;
-            cx.waker().wake_by_ref();
-            return Poll::Pending;
-        }
-
-        let to_read = remaining.min(self.chunk).min(buf.remaining());
-        buf.put_slice(&self.data[self.pos..self.pos + to_read]);
-        self.pos += to_read;
-        self.delayed = false;
-        Poll::Ready(Ok(()))
-    }
-}
-
 async fn try_trickle_tags(chunk: usize) {
     let reader =
         TrickleReader::new("Foo <bar:3>baz <qux:5:n>12345 <eoh>   ", chunk);
@@ -318,40 +272,6 @@ async fn trickle_invalid() {
     let mut f = TagDecoder::new_stream(reader, true);
     let err = f.next().await.unwrap().unwrap_err();
     assert_eq!(err, invalid_format("foo:3:n", 1, 1, 0));
-}
-
-struct TrickleStream<S> {
-    inner: S,
-    delayed: bool,
-}
-
-impl<S> TrickleStream<S> {
-    fn new(inner: S) -> Self {
-        Self {
-            inner,
-            delayed: false,
-        }
-    }
-}
-
-impl<S> Stream for TrickleStream<S>
-where
-    S: Stream + Unpin,
-{
-    type Item = S::Item;
-
-    fn poll_next(
-        mut self: Pin<&mut Self>, cx: &mut Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        if !self.delayed {
-            self.delayed = true;
-            cx.waker().wake_by_ref();
-            return Poll::Pending;
-        }
-
-        self.delayed = false;
-        Pin::new(&mut self.inner).poll_next(cx)
-    }
 }
 
 #[tokio::test]

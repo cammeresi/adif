@@ -110,7 +110,18 @@ of this crate.
 Additionally, each of the property-based tests has run over one million
 times without error.
 
+Although performance is not a primary concern, some benchmarking of
+this crate has been performed to measure parsing performance on a single
+core using synthetic data with 13 fields per record.
+
+- Apple M3 Pro processor (2023) — 583,000 contacts per second
+- Intel Core i5 processor (2021) — 262,000 contacts per second
+
 ## Author
 
 Sidney Cammeresi, AB9BH
+
+THE AUTHOR HAS MADE AND MAKES NO REPRESENTATION OR WARRANTY WHATSOEVER,
+EITHER EXPRESS OR IMPLIED, THAT THIS CRATE IS NOT SIGNIFICANTLY AND
+RIDICULOUSLY OVER-ENGINEERED.
 

@@ -84,6 +84,12 @@ every single transformation an application might desire.  The user can,
 however, write additional normalizers to implement additional
 transformations not heretofore envisioned by the author.
 
+As a convenience tool, the crate also contains a [CabrilloSink] to output
+records as a contest log in [Cabrillo][cabrillo] format.  Reading Cabrillo
+format is not supported.
+
+[cabrillo]: https://wwrof.org/cabrillo/cabrillo-v3-header/
+
 ## Testing
 
 Testing is expected to be extreme.  Code coverage is expected to be in
@@ -96,11 +102,11 @@ in the entire crate is executed by at least one test.  This fact is
 verified by both `cargo llvm-cov` and codecov.io (badge at top).
 
 The report from `cargo llvm-cov` contains a few exceptions in its summary
-data only (5 out of over 3900 regions), but it does not positively
+data only (5 out of over 4300 regions), but it does not positively
 identify any expression in this crate that is not executed by a test.
 These anomalies may be small bits of code from the standard library
 that are inlined by the compiler and that are thus out of the control
-of this crate.
+of this crate.  See file NOTES.md for details about their locations.
 
 > I reviewed your flight plan.  Not one error in a million keystrokes.
 > Phenomenal.  [[Gattaca, 1997][gattaca]]

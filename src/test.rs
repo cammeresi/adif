@@ -163,3 +163,31 @@ fn into_fields() {
     assert_eq!(fields[1].0, "freq");
     assert_eq!(fields[1].1.as_number().unwrap(), Decimal::from(14));
 }
+
+#[test]
+fn to_cabrillo() {
+    let s = Datum::String("test".to_string());
+    assert_eq!(s.to_cabrillo(), "test");
+
+    let b = Datum::Boolean(true);
+    assert_eq!(b.to_cabrillo(), "Y");
+    let b = Datum::Boolean(false);
+    assert_eq!(b.to_cabrillo(), "N");
+
+    let n = Datum::Number(Decimal::from(123));
+    assert_eq!(n.to_cabrillo(), "123");
+
+    let d = Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap());
+    assert_eq!(d.to_cabrillo(), "2024-01-15");
+
+    let t = Datum::Time(NaiveTime::from_hms_opt(12, 34, 56).unwrap());
+    assert_eq!(t.to_cabrillo(), "1234");
+
+    let dt = Datum::DateTime(
+        NaiveDate::from_ymd_opt(2024, 1, 15)
+            .unwrap()
+            .and_hms_opt(12, 34, 56)
+            .unwrap(),
+    );
+    assert_eq!(dt.to_cabrillo(), "2024-01-15 1234");
+}

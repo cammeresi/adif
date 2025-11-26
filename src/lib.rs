@@ -16,6 +16,7 @@ use std::io;
 use std::str::FromStr;
 use thiserror::Error;
 
+pub mod cabrillo;
 mod cistring;
 pub mod filter;
 pub mod parse;
@@ -24,6 +25,7 @@ pub mod write;
 #[cfg(test)]
 mod test;
 
+pub use cabrillo::CabrilloSink;
 pub use cistring::{CiStr, CiString};
 pub use filter::{FilterExt, NormalizeExt};
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
@@ -79,6 +81,20 @@ pub enum Error {
         /// Reason why it cannot be output
         reason: &'static str,
     },
+    /// Missing required field in record.
+    #[error("missing required field '{field}' in record")]
+    MissingField {
+        /// Missing field name
+        field: String,
+        /// Record missing the field
+        record: Record,
+    },
+    /// First record must be a header record.
+    #[error("first record must be a header record")]
+    MissingHeader,
+    /// Multiple header records encountered.
+    #[error("duplicate header record")]
+    DuplicateHeader,
 }
 
 impl PartialEq for Error {
@@ -115,6 +131,18 @@ impl PartialEq for Error {
                     reason: rb,
                 },
             ) => ta == tb && ra == rb,
+            (
+                Error::MissingField {
+                    field: fa,
+                    record: ra,
+                },
+                Error::MissingField {
+                    field: fb,
+                    record: rb,
+                },
+            ) => fa == fb && ra == rb,
+            (Error::MissingHeader, Error::MissingHeader) => true,
+            (Error::DuplicateHeader, Error::DuplicateHeader) => true,
             _ => false,
         }
     }
@@ -142,6 +170,10 @@ pub enum Datum {
 }
 
 impl Datum {
+    fn bool_str(b: bool) -> &'static str {
+        if b { "Y" } else { "N" }
+    }
+
     /// Return a [bool] value or coerce a string thereto.
     ///
     /// Returns [None] if a string value fails to parse.
@@ -210,12 +242,26 @@ impl Datum {
     pub fn as_str(&self) -> Cow<'_, str> {
         match self {
             Self::String(s) => Cow::Borrowed(s),
-            Self::Boolean(b) => Cow::Borrowed(if *b { "Y" } else { "N" }),
+            Self::Boolean(b) => Cow::Borrowed(Self::bool_str(*b)),
             Self::Number(n) => Cow::Owned(n.to_string()),
             Self::Date(d) => Cow::Owned(d.format("%Y%m%d").to_string()),
             Self::Time(t) => Cow::Owned(t.format("%H%M%S").to_string()),
             Self::DateTime(dt) => {
                 Cow::Owned(dt.format("%Y%m%d %H%M%S").to_string())
+            }
+        }
+    }
+
+    /// Coerce any datum to Cabrillo format string representation.
+    pub fn to_cabrillo(&self) -> Cow<'_, str> {
+        match self {
+            Self::String(s) => Cow::Borrowed(s),
+            Self::Boolean(b) => Cow::Borrowed(Self::bool_str(*b)),
+            Self::Number(n) => Cow::Owned(n.to_string()),
+            Self::Date(d) => Cow::Owned(d.format("%Y-%m-%d").to_string()),
+            Self::Time(t) => Cow::Owned(t.format("%H%M").to_string()),
+            Self::DateTime(dt) => {
+                Cow::Owned(dt.format("%Y-%m-%d %H%M").to_string())
             }
         }
     }

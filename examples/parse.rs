@@ -32,16 +32,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Add a band field if none exists.
     let mut stream = stream.normalize(|record| {
         if record.is_header() {
-            return;
+            return Ok(());
         }
         if record.get("band").is_some() {
-            return;
+            return Ok(());
         }
         if let Some(freq) = record.get("freq").and_then(|f| f.as_number())
             && let Some(band) = freq_to_band(freq)
         {
-            let _ = record.insert("band", band);
+            record.insert("band", band)?;
         }
+        Ok(())
     });
 
     while let Some(result) = stream.next().await {

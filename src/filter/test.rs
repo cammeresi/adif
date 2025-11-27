@@ -343,7 +343,7 @@ async fn exclude_header_no_header() {
 #[tokio::test]
 async fn normalize_error_passthrough() {
     let stream = RecordStream::new("<call:4>W1AW<eor><bad".as_bytes(), false);
-    let mut normalized = stream.normalize(|_record| {});
+    let mut normalized = stream.normalize(|_| Ok(()));
     let rec = next(&mut normalized).await;
     assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     let err = normalized.next().await.unwrap().unwrap_err();
@@ -363,7 +363,7 @@ async fn filter_error_passthrough() {
 #[tokio::test]
 async fn normalize_end_of_stream() {
     let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
-    let mut normalized = stream.normalize(|_record| {});
+    let mut normalized = stream.normalize(|_| Ok(()));
     let rec = next(&mut normalized).await;
     assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     assert!(normalized.next().await.is_none());

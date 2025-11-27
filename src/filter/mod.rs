@@ -19,7 +19,7 @@ pub struct Normalize<S, F> {
 impl<S, F> Stream for Normalize<S, F>
 where
     S: Stream<Item = Result<Record, Error>> + Unpin,
-    F: FnMut(&mut Record) + Unpin,
+    F: FnMut(&mut Record) -> Result<(), Error> + Unpin,
 {
     type Item = Result<Record, Error>;
 
@@ -28,10 +28,10 @@ where
     ) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         match Pin::new(&mut this.stream).poll_next(cx) {
-            Poll::Ready(Some(Ok(mut record))) => {
-                (this.f)(&mut record);
-                Poll::Ready(Some(Ok(record)))
-            }
+            Poll::Ready(Some(Ok(mut record))) => match (this.f)(&mut record) {
+                Ok(()) => Poll::Ready(Some(Ok(record))),
+                Err(e) => Poll::Ready(Some(Err(e))),
+            },
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
@@ -45,7 +45,7 @@ pub trait NormalizeExt: Stream {
     fn normalize<F>(self, f: F) -> Normalize<Self, F>
     where
         Self: Sized,
-        F: FnMut(&mut Record),
+        F: FnMut(&mut Record) -> Result<(), Error>,
     {
         Normalize { stream: self, f }
     }
@@ -126,9 +126,9 @@ impl<S> FilterExt for S where S: Stream {}
 /// ```
 pub fn normalize_times<S>(
     stream: S,
-) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
+) -> Normalize<S, impl FnMut(&mut Record) -> Result<(), Error> + Unpin>
 where
-    S: Stream<Item = Result<Record, Error>>,
+    S: Stream<Item = Result<Record, Error>> + Unpin,
 {
     const TIME_ON: &str = ":time_on";
     const TIME_OFF: &str = ":time_off";
@@ -138,23 +138,24 @@ where
         let date_off = record.get("qso_date_off").and_then(|d| d.as_date());
         let time_on = record.get("time_on").and_then(|t| t.as_time());
         let time_off = record.get("time_off").and_then(|t| t.as_time());
+        let (Some(date), Some(time_on)) = (date, time_on) else {
+            return Ok(());
+        };
+        let dt = NaiveDateTime::new(date, time_on);
+        record.insert(TIME_ON, dt)?;
 
-        if let (Some(date), Some(time_on)) = (date, time_on) {
-            let dt = NaiveDateTime::new(date, time_on);
-            let _ = record.insert(TIME_ON, dt);
-
-            if let Some(time_off) = time_off {
-                let date = if let Some(date_off) = date_off {
-                    date_off
-                } else if time_off < time_on {
-                    date + Days::new(1)
-                } else {
-                    date
-                };
-                let dt = NaiveDateTime::new(date, time_off);
-                let _ = record.insert(TIME_OFF, dt);
-            }
-        }
+        let Some(time_off) = time_off else {
+            return Ok(());
+        };
+        let date = if let Some(date_off) = date_off {
+            date_off
+        } else if time_off < time_on {
+            date + Days::new(1)
+        } else {
+            date
+        };
+        let dt = NaiveDateTime::new(date, time_off);
+        record.insert(TIME_OFF, dt)
     })
 }
 
@@ -165,7 +166,7 @@ where
 /// of MFSK (i.e. FT4, Q65).
 pub fn normalize_mode<S>(
     stream: S,
-) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
+) -> Normalize<S, impl FnMut(&mut Record) -> Result<(), Error> + Unpin>
 where
     S: Stream<Item = Result<Record, Error>>,
 {
@@ -179,7 +180,7 @@ where
             .or_else(|| record.get("app_lotw_modegroup"))
             .map(|m| m.as_str());
 
-        let Some(mode) = mode else { return };
+        let Some(mode) = mode else { return Ok(()) };
         let sub = record.get("submode").map(|s| s.as_str());
 
         let mode = match sub {
@@ -194,7 +195,7 @@ where
             _ => mode,
         };
 
-        let _ = record.insert(MODE, mode.into_owned());
+        record.insert(MODE, mode.into_owned())
     })
 }
 
@@ -217,7 +218,7 @@ where
 /// ```
 pub fn normalize_band<S>(
     stream: S,
-) -> Normalize<S, impl FnMut(&mut Record) + Unpin>
+) -> Normalize<S, impl FnMut(&mut Record) -> Result<(), Error> + Unpin>
 where
     S: Stream<Item = Result<Record, Error>>,
 {
@@ -225,7 +226,7 @@ where
 
     stream.normalize(|record| {
         let Some(band) = record.get("band").map(|b| b.as_str()) else {
-            return;
+            return Ok(());
         };
 
         let band =
@@ -234,7 +235,7 @@ where
             } else {
                 band.to_uppercase()
             };
-        let _ = record.insert(BAND, band);
+        record.insert(BAND, band)
     })
 }
 

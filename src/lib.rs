@@ -6,6 +6,7 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]
 #![cfg_attr(not(test), deny(clippy::expect_used))]
 #![doc = include_str!("../README.md")]
+// #![cfg_attr(feature = "nightly", feature(coverage_attribute))]
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use indexmap::{IndexMap, map::Entry};

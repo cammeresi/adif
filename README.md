@@ -92,21 +92,19 @@ format is not supported.
 
 ## Testing
 
-Testing is expected to be extreme.  Code coverage is expected to be in
-excess of 99%.
+Test coverage of this crate is 100% as of 2025-11-27.
 
-As of 2025-11-21, test coverage is 100%.
+Every single function, every single line, every single expression,
+and every single character in the entire crate is executed by at least
+one test.
 
-Every single function, every single line, and every single expression
-in the entire crate is executed by at least one test.  This fact is
-verified by both `cargo llvm-cov` and codecov.io (badge at top).
+Every single branch in every single function is tested by at least one
+concrete instantiation.  (For function `Foo<T>::bar`, there exists at
+least one `T` for which the tests test every possible path through `bar`.)
 
-The report from `cargo llvm-cov` contains a few exceptions in its summary
-data only (5 out of over 4300 regions), but it does not positively
-identify any expression in this crate that is not executed by a test.
-These anomalies may be small bits of code from the standard library
-that are inlined by the compiler and that are thus out of the control
-of this crate.  See file NOTES.md for details about their locations.
+These facts are verified by both `cargo llvm-cov` and codecov.io (badge
+at top) across over 4500 code regions.  The nightly toolchain may be
+used to verify branch coverage.
 
 > I reviewed your flight plan.  Not one error in a million keystrokes.
 > Phenomenal.  [[Gattaca, 1997][gattaca]]
@@ -120,8 +118,8 @@ Although performance is not a primary concern, some benchmarking of
 this crate has been performed to measure parsing performance on a single
 core using synthetic data with 13 fields per record.
 
-- Apple M3 Pro processor (2023) — 583,000 contacts per second
-- Intel Core i5 processor (2021) — 262,000 contacts per second
+- Apple M3 Pro processor (2023) — 544,000 contacts per second
+- Intel Core i5 processor (2021) — 252,000 contacts per second
 
 ## Author
 

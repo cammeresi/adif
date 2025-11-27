@@ -129,8 +129,14 @@ fn as_datetime_unsupported_types() {
     assert!(b.as_datetime().is_none());
 }
 
+fn assert_errs_ne(e1: Error, e2: Error, e3: Error) {
+    assert_ne!(e1, e2);
+    assert_ne!(e1, e3);
+    assert_ne!(e2, e3);
+}
+
 #[test]
-fn error_eq_io_errors() {
+fn error_eq() {
     let e1 = Error::Io(io::Error::new(io::ErrorKind::NotFound, "test"));
     let e2 = Error::Io(io::Error::new(io::ErrorKind::NotFound, "test"));
     let e3 = Error::Io(io::Error::new(io::ErrorKind::PermissionDenied, "test"));
@@ -138,6 +144,30 @@ fn error_eq_io_errors() {
     assert_eq!(e1, e2);
     assert_ne!(e1, e3);
     assert_ne!(e1, invalid_format("msg", 1, 1, 0));
+
+    let e1 = invalid_format("abc", 1, 1, 0);
+    let e2 = invalid_format("def", 1, 1, 0);
+    let e3 = invalid_format("abc", 2, 1, 0);
+    assert_errs_ne(e1, e2, e3);
+
+    let mut rec = Record::new();
+    let e1 = duplicate_key("abc", rec.clone());
+    let e2 = duplicate_key("def", rec.clone());
+    rec.insert("a", "").unwrap();
+    let e3 = duplicate_key("abc", rec);
+    assert_errs_ne(e1, e2, e3);
+
+    let e1 = cannot_output("a", "a");
+    let e2 = cannot_output("a", "b");
+    let e3 = cannot_output("b", "a");
+    assert_errs_ne(e1, e2, e3);
+
+    let mut rec = Record::new();
+    let e1 = missing_field("abc", rec.clone());
+    let e2 = missing_field("def", rec.clone());
+    rec.insert("a", "").unwrap();
+    let e3 = missing_field("abc", rec);
+    assert_errs_ne(e1, e2, e3);
 }
 
 #[test]

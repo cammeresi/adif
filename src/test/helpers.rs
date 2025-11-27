@@ -32,6 +32,13 @@ pub(crate) fn cannot_output(typ: &'static str, reason: &'static str) -> Error {
     Error::CannotOutput { typ, reason }
 }
 
+pub(crate) fn missing_field(field: &str, record: Record) -> Error {
+    Error::MissingField {
+        field: field.into(),
+        record,
+    }
+}
+
 pub(crate) struct TrickleReader {
     data: Vec<u8>,
     pos: usize,

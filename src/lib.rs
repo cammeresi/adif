@@ -96,6 +96,9 @@ pub enum Error {
     /// Multiple header records encountered.
     #[error("duplicate header record")]
     DuplicateHeader,
+    /// Error from a normalizer or filter.
+    #[error("filter error: {0}")]
+    Filter(Cow<'static, str>),
 }
 
 impl PartialEq for Error {
@@ -144,6 +147,7 @@ impl PartialEq for Error {
             ) => fa == fb && ra == rb,
             (Error::MissingHeader, Error::MissingHeader) => true,
             (Error::DuplicateHeader, Error::DuplicateHeader) => true,
+            (Error::Filter(a), Error::Filter(b)) => a == b,
             _ => false,
         }
     }

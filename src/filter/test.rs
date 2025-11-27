@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime};
 use futures::StreamExt;
 
 use super::*;
@@ -21,26 +21,77 @@ where
     stream.next().await.unwrap().unwrap()
 }
 
-async fn parse_with<'a, F, S>(adif: &'a str, f: F) -> Record
+async fn next_err<S>(stream: &mut S, err: Error)
 where
-    F: FnOnce(RecordStream<TagStream<&'a [u8]>>) -> S,
     S: Stream<Item = Result<Record, Error>> + Unpin,
 {
-    let stream = RecordStream::new(adif.as_bytes(), true);
-    let mut normalized = f(stream);
-    next(&mut normalized).await
+    assert_eq!(stream.next().await.unwrap().unwrap_err(), err);
 }
 
-async fn parse_norm_times(adif: &str) -> Record {
-    parse_with(adif, normalize_times).await
+async fn no_record<S>(stream: &mut S)
+where
+    S: Stream<Item = Result<Record, Error>> + Unpin,
+{
+    assert!(stream.next().await.is_none());
+}
+
+fn assert_time_on_only(rec: &Record, expected_on: NaiveDateTime) {
+    let time_on = rec.get(":time_on").unwrap().as_datetime().unwrap();
+    assert_eq!(time_on, expected_on);
+    assert!(rec.get(":time_off").is_none());
+}
+
+fn assert_both_times(
+    rec: &Record, expected_on: NaiveDateTime, expected_off: NaiveDateTime,
+) {
+    let time_on = rec.get(":time_on").unwrap().as_datetime().unwrap();
+    assert_eq!(time_on, expected_on);
+    let time_off = rec.get(":time_off").unwrap().as_datetime().unwrap();
+    assert_eq!(time_off, expected_off);
+}
+
+fn duplicate_key_error(key: &str, record: Record) -> Error {
+    Error::DuplicateKey {
+        key: key.to_string(),
+        record,
+    }
+}
+
+fn parse_many_ignore<'a, F, S>(adif: &'a str, ignore_partial: bool, f: F) -> S
+where
+    F: FnOnce(TrickleStream<RecordStream<TagStream<&'a [u8]>>>) -> S,
+    S: Stream<Item = Result<Record, Error>> + Unpin,
+{
+    let stream = RecordStream::new(adif.as_bytes(), ignore_partial);
+    let stream = TrickleStream::new(stream);
+    f(stream)
+}
+
+fn parse_many<'a, F, S>(adif: &'a str, f: F) -> S
+where
+    F: FnOnce(TrickleStream<RecordStream<TagStream<&'a [u8]>>>) -> S,
+    S: Stream<Item = Result<Record, Error>> + Unpin,
+{
+    parse_many_ignore(adif, true, f)
+}
+
+async fn parse_one<'a, F, S>(adif: &'a str, f: F) -> Record
+where
+    F: FnOnce(TrickleStream<RecordStream<TagStream<&'a [u8]>>>) -> S,
+    S: Stream<Item = Result<Record, Error>> + Unpin,
+{
+    let mut s = parse_many(adif, f);
+    let rec = next(&mut s).await;
+    no_record(&mut s).await;
+    rec
 }
 
 async fn parse_norm_mode(adif: &str) -> Record {
-    parse_with(adif, normalize_mode).await
+    parse_one(adif, normalize_mode).await
 }
 
 async fn parse_norm_band(adif: &str) -> Record {
-    parse_with(adif, normalize_band).await
+    parse_one(adif, normalize_band).await
 }
 
 #[tokio::test]
@@ -110,6 +161,26 @@ async fn normalize_mode_case_insensitive() {
 }
 
 #[tokio::test]
+async fn normalize_mode_duplicate_key() {
+    let stream = RecordStream::new("<mode:3>FT8<eor>".as_bytes(), true);
+    let stream = normalize_mode(stream);
+    let mut stream = normalize_mode(stream);
+    let err = stream.next().await.unwrap().unwrap_err();
+
+    let mut expected_record = Record::new();
+    expected_record.insert("mode", "FT8").unwrap();
+    expected_record.insert(":mode", "FT8").unwrap();
+
+    assert_eq!(
+        err,
+        Error::DuplicateKey {
+            key: ":mode".to_string(),
+            record: expected_record,
+        }
+    );
+}
+
+#[tokio::test]
 async fn normalize_band_uppercase() {
     let record = parse_norm_band("<band:3>20m<eor>").await;
     assert_eq!(record.get(":band").unwrap().as_str(), "20M");
@@ -128,112 +199,114 @@ async fn normalize_band_no_band() {
 }
 
 #[tokio::test]
-async fn trickle_normalize_band() {
-    let stream =
-        RecordStream::new("<band:3>20m<eor><band:3>40M<eor>".as_bytes(), true);
-    let trickled = TrickleStream::new(stream);
-    let mut normalized = normalize_band(trickled);
+async fn normalize_band_duplicate_key() {
+    let stream = RecordStream::new("<band:3>20m<eor>".as_bytes(), true);
+    let stream = normalize_band(stream);
+    let mut stream = normalize_band(stream);
+    let err = stream.next().await.unwrap().unwrap_err();
 
-    let rec = next(&mut normalized).await;
-    assert_eq!(rec.get(":band").unwrap().as_str(), "20M");
-
-    let rec = next(&mut normalized).await;
-    assert_eq!(rec.get(":band").unwrap().as_str(), "40M");
-}
-
-#[tokio::test]
-async fn normalize_times_typed() {
-    let record =
-        parse_norm_times("<qso_date:8:d>20231215<time_on:6:t>143000<eor>")
-            .await;
-
-    let time_on = record.get(":time_on").unwrap().as_datetime().unwrap();
-    assert_eq!(time_on, dt(2023, 12, 15, 14, 30, 0));
-    assert!(record.get(":time_off").is_none());
-}
-
-#[tokio::test]
-async fn normalize_times_basic() {
-    let record =
-        parse_norm_times("<qso_date:8>20231215<time_on:6>143000<eor>").await;
-
-    let time_on = record.get(":time_on").unwrap().as_datetime().unwrap();
-    assert_eq!(time_on, dt(2023, 12, 15, 14, 30, 0));
-    assert!(record.get(":time_off").is_none());
-}
-
-#[tokio::test]
-async fn normalize_times_with_time_off_same_day() {
-    let record = parse_norm_times(
-        "<qso_date:8>20231215<time_on:6>143000<time_off:6>153000<eor>",
-    )
-    .await;
-
-    let time_on = record.get(":time_on").unwrap().as_datetime().unwrap();
-    assert_eq!(time_on, dt(2023, 12, 15, 14, 30, 0));
-    let time_off = record.get(":time_off").unwrap().as_datetime().unwrap();
-    assert_eq!(time_off, dt(2023, 12, 15, 15, 30, 0));
-}
-
-#[tokio::test]
-async fn normalize_times_with_time_off_next_day() {
-    let record = parse_norm_times(
-        "<qso_date:8>20231215<time_on:6>233000<time_off:6>001500<eor>",
-    )
-    .await;
-
-    let time_on = record.get(":time_on").unwrap().as_datetime().unwrap();
-    assert_eq!(time_on, dt(2023, 12, 15, 23, 30, 0));
-    let time_off = record.get(":time_off").unwrap().as_datetime().unwrap();
-    assert_eq!(time_off, dt(2023, 12, 16, 0, 15, 0));
-}
-
-#[tokio::test]
-async fn normalize_times_with_qso_date_off() {
-    let record = parse_norm_times(
-        "<qso_date:8>20231215<time_on:6>233000<qso_date_off:8>20231216<time_off:6>013000<eor>",
-    )
-    .await;
-
-    let time_on = record.get(":time_on").unwrap().as_datetime().unwrap();
-    assert_eq!(time_on, dt(2023, 12, 15, 23, 30, 0));
-    let time_off = record.get(":time_off").unwrap().as_datetime().unwrap();
-    assert_eq!(time_off, dt(2023, 12, 16, 1, 30, 0));
-}
-
-#[tokio::test]
-async fn normalize_times_with_qso_date_off_midnight_cross() {
-    let record = parse_norm_times(
-        "<qso_date:8>20231231<time_on:6>233000<qso_date_off:8>20240101<time_off:6>003000<eor>",
-    )
-    .await;
-
-    let time_on = record.get(":time_on").unwrap().as_datetime().unwrap();
-    assert_eq!(time_on, dt(2023, 12, 31, 23, 30, 0));
-    let time_off = record.get(":time_off").unwrap().as_datetime().unwrap();
-    assert_eq!(time_off, dt(2024, 1, 1, 0, 30, 0));
-}
-
-#[tokio::test]
-async fn normalize_times_missing_date() {
-    let record = parse_norm_times("<time_on:6>143000<eor>").await;
+    let mut expected_record = Record::new();
+    expected_record.insert("band", "20m").unwrap();
+    expected_record.insert(":band", "20M").unwrap();
 
     assert_eq!(
-        record.get("time_on").unwrap().as_time().unwrap(),
-        NaiveTime::from_hms_opt(14, 30, 0).unwrap()
+        err,
+        Error::DuplicateKey {
+            key: ":band".to_string(),
+            record: expected_record,
+        }
     );
 }
 
 #[tokio::test]
-async fn normalize_times_missing_time_on() {
-    let record = parse_norm_times("<qso_date:8>20231215<eor>").await;
+async fn normalize_times_duplicate_key() {
+    let mut count = 0;
+    let mut s = parse_many(
+        "<qso_date:8>20240101<time_on:6>120000<eor>
+         <qso_date:8>20240101<time_on:6>120000<qso_date_off:8>20240101<time_off:6>130000<eor>
+         <qso_date:8:d>20231215<time_on:6:t>143000<eor>
+         <qso_date:8>20231215<time_on:6>143000<eor>
+         <qso_date:8>20231215<time_on:6>143000<time_off:6>153000<eor>
+         <qso_date:8>20231215<time_on:6>233000<time_off:6>001500<eor>
+         <qso_date:8>20231215<time_on:6>233000<qso_date_off:8>20231216<time_off:6>013000<eor>
+         <qso_date:8>20231231<time_on:6>233000<qso_date_off:8>20240101<time_off:6>003000<eor>
+         <qso_date:8>20231215<eor>",
+        |s| {
+            normalize_times(s.normalize(move |r| {
+                count += 1;
+                if count == 1 {
+                    r.insert(":time_on", "")
+                } else if count == 2 {
+                    r.insert(":time_off", "")
+                } else {
+                    Ok(())
+                }
+            }))
+        },
+    );
 
+    let mut expected_record = Record::new();
+    expected_record.insert("qso_date", "20240101").unwrap();
+    expected_record.insert("time_on", "120000").unwrap();
+    expected_record.insert(":time_on", "").unwrap();
+    next_err(&mut s, duplicate_key_error(":time_on", expected_record)).await;
+
+    let mut expected_record = Record::new();
+    expected_record.insert("qso_date", "20240101").unwrap();
+    expected_record.insert("time_on", "120000").unwrap();
+    expected_record.insert("qso_date_off", "20240101").unwrap();
+    expected_record.insert("time_off", "130000").unwrap();
+    expected_record.insert(":time_off", "").unwrap();
+    expected_record
+        .insert(":time_on", dt(2024, 1, 1, 12, 0, 0))
+        .unwrap();
+    next_err(&mut s, duplicate_key_error(":time_off", expected_record)).await;
+
+    let rec = next(&mut s).await;
+    assert_time_on_only(&rec, dt(2023, 12, 15, 14, 30, 0));
+
+    let rec = next(&mut s).await;
+    assert_time_on_only(&rec, dt(2023, 12, 15, 14, 30, 0));
+
+    let rec = next(&mut s).await;
+    assert_both_times(
+        &rec,
+        dt(2023, 12, 15, 14, 30, 0),
+        dt(2023, 12, 15, 15, 30, 0),
+    );
+
+    let rec = next(&mut s).await;
+    assert_both_times(
+        &rec,
+        dt(2023, 12, 15, 23, 30, 0),
+        dt(2023, 12, 16, 0, 15, 0),
+    );
+
+    let rec = next(&mut s).await;
+    assert_both_times(
+        &rec,
+        dt(2023, 12, 15, 23, 30, 0),
+        dt(2023, 12, 16, 1, 30, 0),
+    );
+
+    let rec = next(&mut s).await;
+    assert_both_times(
+        &rec,
+        dt(2023, 12, 31, 23, 30, 0),
+        dt(2024, 1, 1, 0, 30, 0),
+    );
+
+    let rec = next(&mut s).await;
     assert_eq!(
-        record.get("qso_date").unwrap().as_date().unwrap(),
+        rec.get("qso_date").unwrap().as_date().unwrap(),
         NaiveDate::from_ymd_opt(2023, 12, 15).unwrap()
     );
-    assert!(record.get("time_on").is_none());
-    assert!(record.get("time_off").is_none());
+    assert!(rec.get("time_on").is_none());
+    assert!(rec.get("time_off").is_none());
+    assert!(rec.get(":time_on").is_none());
+    assert!(rec.get(":time_off").is_none());
+
+    no_record(&mut s).await;
 }
 
 #[tokio::test]
@@ -341,39 +414,45 @@ async fn exclude_header_no_header() {
 }
 
 #[tokio::test]
-async fn normalize_error_passthrough() {
-    let stream = RecordStream::new("<call:4>W1AW<eor><bad".as_bytes(), false);
-    let mut normalized = stream.normalize(|_| Ok(()));
-    let rec = next(&mut normalized).await;
-    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
-    let err = normalized.next().await.unwrap().unwrap_err();
-    assert_eq!(err, partial_data(1, 18, 17));
+async fn normalize_error() {
+    let mut s = parse_many_ignore(
+        "<call:4>W1AW<eor><call:5>AB9BH<eor><bad",
+        false,
+        |s| {
+            s.normalize(|r| {
+                if r.get("call").unwrap().as_str() == "W1AW" {
+                    Err(Error::Filter("invalid callsign".into()))
+                } else {
+                    Ok(())
+                }
+            })
+        },
+    );
+    next_err(&mut s, Error::Filter("invalid callsign".into())).await;
+    let rec = next(&mut s).await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "AB9BH");
+    next_err(&mut s, partial_data(1, 36, 35)).await;
+    no_record(&mut s).await;
 }
 
 #[tokio::test]
 async fn filter_error_passthrough() {
-    let stream = RecordStream::new("<call:4>W1AW<eor><bad".as_bytes(), false);
-    let mut filtered = FilterExt::filter(stream, |_record| true);
-    let rec = next(&mut filtered).await;
-    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
-    let err = filtered.next().await.unwrap().unwrap_err();
-    assert_eq!(err, partial_data(1, 18, 17));
-}
-
-#[tokio::test]
-async fn normalize_end_of_stream() {
-    let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
-    let mut normalized = stream.normalize(|_| Ok(()));
-    let rec = next(&mut normalized).await;
-    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
-    assert!(normalized.next().await.is_none());
+    let mut s = parse_many_ignore(
+        "<call:4>W1AW<eor><call:5>AB9BH<eor><bad",
+        false,
+        |s| FilterExt::filter(s, |r| r.get("call").unwrap().as_str() != "W1AW"),
+    );
+    let rec = next(&mut s).await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "AB9BH");
+    next_err(&mut s, partial_data(1, 36, 35)).await;
+    no_record(&mut s).await;
 }
 
 #[tokio::test]
 async fn filter_end_of_stream() {
-    let stream = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
-    let mut filtered = FilterExt::filter(stream, |_record| true);
-    let rec = next(&mut filtered).await;
+    let mut s =
+        parse_many("<call:4>W1AW<eor>", |s| FilterExt::filter(s, |_| true));
+    let rec = next(&mut s).await;
     assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
-    assert!(filtered.next().await.is_none());
+    no_record(&mut s).await;
 }

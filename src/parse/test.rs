@@ -275,16 +275,37 @@ async fn trickle_invalid() {
 }
 
 #[tokio::test]
+async fn trickle_duplicate() {
+    let reader = TrickleReader::new("<foo:3>abc<foo:3>def<eor>", 1);
+    let reader = TagDecoder::new_stream(reader, true);
+    let reader = TrickleStream::new(reader);
+    let mut f = reader.records();
+    let err = f.next().await.unwrap().unwrap_err();
+    let mut r = Record::new();
+    r.insert("foo", "abc").unwrap();
+    assert_eq!(err, duplicate_key("foo", r));
+}
+
+#[tokio::test]
 async fn trickle_records() {
-    let reader = TrickleReader::new("<foo:3>abc<eor><foo:4>defg<eor>", 1);
+    let reader =
+        TrickleReader::new("<qux:1>a<eoh><foo:3>abc<eor><foo:4>defg<eor><", 1);
     let reader = TagDecoder::new_stream(reader, false);
     let reader = TrickleStream::new(reader);
     let mut f = reader.records();
 
+    let rec = next_record(&mut f, true).await;
+    assert_eq!(rec.get("qux").unwrap().as_str(), "a");
     let rec = next_record(&mut f, false).await;
     assert_eq!(rec.get("foo").unwrap().as_str(), "abc");
     let rec = next_record(&mut f, false).await;
     assert_eq!(rec.get("foo").unwrap().as_str(), "defg");
+    let err = f.next().await.unwrap().unwrap_err();
+    assert_eq!(
+        err,
+        invalid_format("partial data at end of stream", 1, 45, 44)
+    );
+    no_records(&mut f).await;
 }
 
 #[tokio::test]

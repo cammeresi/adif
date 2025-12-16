@@ -169,6 +169,15 @@ pub enum Datum {
     /// Time value (type indicator `t` in ADIF tags), format HHMMSS.
     Time(NaiveTime),
     /// Combined date and time value.
+    ///
+    /// This type is not part of the ADIF specification, but it provided as
+    /// a convenience, e.g. for output by a data normalizer that could
+    /// combine date and time into a single field.
+    ///
+    /// This type can be output via the output module provided that the
+    /// writer is configured to not output a type indicator for the datetime
+    /// field.  Attempting to output a datetime with a type indicator will
+    /// return an error.
     DateTime(NaiveDateTime),
     /// String value (default when no type indicator is present).
     String(String),

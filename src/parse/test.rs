@@ -193,6 +193,38 @@ async fn underscore() {
 }
 
 #[tokio::test]
+async fn trim_typed() {
+    let mut f = tags("<a:5:n> 1.0 <b:3:b> Y <c:10:d> 20200101 <d:8:t> 123456 ");
+
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "a");
+    assert_eq!(
+        field.value().as_number().unwrap(),
+        Decimal::from_str("1.0").unwrap()
+    );
+
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "b");
+    assert!(field.value().as_bool().unwrap());
+
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "c");
+    assert_eq!(
+        field.value().as_date().unwrap(),
+        NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()
+    );
+
+    let field = next_field(&mut f).await;
+    assert_eq!(field.name(), "d");
+    assert_eq!(
+        field.value().as_time().unwrap(),
+        NaiveTime::from_hms_opt(12, 34, 56).unwrap()
+    );
+
+    no_tags(&mut f).await;
+}
+
+#[tokio::test]
 async fn case_insensitive_lookup() {
     let mut s = RecordStream::new("<FOO:3>Bar<eor>".as_bytes(), true);
     let record = s.next().await.unwrap().unwrap();

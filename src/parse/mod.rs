@@ -106,12 +106,12 @@ impl TagDecoder {
     ) -> Result<Datum, Error> {
         match typ {
             Some("n") | Some("N") => {
-                let num =
-                    Decimal::from_str(v).map_err(|_| self.invalid_tag(tag))?;
+                let num = Decimal::from_str(v.trim())
+                    .map_err(|_| self.invalid_tag(tag))?;
                 Ok(Datum::Number(num))
             }
             Some("b") | Some("B") => {
-                let b = match v {
+                let b = match v.trim() {
                     "Y" | "y" => true,
                     "N" | "n" => false,
                     _ => return Err(self.invalid_tag(tag)),
@@ -119,12 +119,12 @@ impl TagDecoder {
                 Ok(Datum::Boolean(b))
             }
             Some("d") | Some("D") => {
-                let date = NaiveDate::parse_from_str(v, "%Y%m%d")
+                let date = NaiveDate::parse_from_str(v.trim(), "%Y%m%d")
                     .map_err(|_| self.invalid_tag(tag))?;
                 Ok(Datum::Date(date))
             }
             Some("t") | Some("T") => {
-                let time = NaiveTime::parse_from_str(v, "%H%M%S")
+                let time = NaiveTime::parse_from_str(v.trim(), "%H%M%S")
                     .map_err(|_| self.invalid_tag(tag))?;
                 Ok(Datum::Time(time))
             }

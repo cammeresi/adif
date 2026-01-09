@@ -106,9 +106,9 @@ impl<S> FilterExt for S where S: Stream {}
 /// components.  Handle date crossing when time_off is earlier than time_on.
 ///
 /// ```
+/// use chrono::{NaiveDate, NaiveTime, Timelike};
 /// use difa::filter::normalize_times;
 /// use difa::{Datum, Record, RecordStreamExt, TagDecoder};
-/// use chrono::{NaiveDate, NaiveTime, Timelike};
 /// use futures::StreamExt;
 ///
 /// # tokio_test::block_on(async {

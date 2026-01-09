@@ -33,8 +33,8 @@ impl TagEncoder {
     /// Create a new TagEncoder with default configuration.
     ///
     /// ```
-    /// use difa::{Field, Tag, TagEncoder};
     /// use bytes::BytesMut;
+    /// use difa::{Field, Tag, TagEncoder};
     /// use tokio_util::codec::Encoder;
     ///
     /// let mut encoder = TagEncoder::new();
@@ -50,8 +50,8 @@ impl TagEncoder {
     /// Create a new TagEncoder with specified type specifier behavior.
     ///
     /// ```
-    /// use difa::{Field, OutputTypes, Tag, TagEncoder};
     /// use bytes::BytesMut;
+    /// use difa::{Field, OutputTypes, Tag, TagEncoder};
     /// use tokio_util::codec::Encoder;
     ///
     /// let mut encoder = TagEncoder::with_types(OutputTypes::Always);

@@ -116,7 +116,7 @@ where
     /// typed data according to the format.
     ///
     /// ```
-    /// use adif::{CabrilloSink, Record};
+    /// use difa::{CabrilloSink, Record};
     /// use futures::SinkExt;
     ///
     /// # #[tokio::main(flavor = "current_thread")]

@@ -33,7 +33,7 @@ impl TagEncoder {
     /// Create a new TagEncoder with default configuration.
     ///
     /// ```
-    /// use adif::{Field, Tag, TagEncoder};
+    /// use difa::{Field, Tag, TagEncoder};
     /// use bytes::BytesMut;
     /// use tokio_util::codec::Encoder;
     ///
@@ -50,7 +50,7 @@ impl TagEncoder {
     /// Create a new TagEncoder with specified type specifier behavior.
     ///
     /// ```
-    /// use adif::{Field, OutputTypes, Tag, TagEncoder};
+    /// use difa::{Field, OutputTypes, Tag, TagEncoder};
     /// use bytes::BytesMut;
     /// use tokio_util::codec::Encoder;
     ///
@@ -67,7 +67,7 @@ impl TagEncoder {
     /// Create a sink from this encoder and a writer.
     ///
     /// ```
-    /// use adif::{Field, Tag, TagEncoder};
+    /// use difa::{Field, Tag, TagEncoder};
     /// use futures::SinkExt;
     ///
     /// # tokio_test::block_on(async {
@@ -206,7 +206,7 @@ where
     /// Create a new RecordSink with default configuration.
     ///
     /// ```
-    /// use adif::{Record, RecordSink};
+    /// use difa::{Record, RecordSink};
     /// use futures::SinkExt;
     ///
     /// # tokio_test::block_on(async {

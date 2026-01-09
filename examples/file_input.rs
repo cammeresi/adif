@@ -1,4 +1,4 @@
-use adif::RecordStream;
+use difa::RecordStream;
 use futures::StreamExt;
 use tokio::fs::File;
 use tokio::io::BufReader;

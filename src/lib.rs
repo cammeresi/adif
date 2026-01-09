@@ -396,7 +396,7 @@ impl Record {
     /// Create a new record.
     ///
     /// ```
-    /// use adif::Record;
+    /// use difa::Record;
     /// let mut record = Record::new();
     /// record.insert("call", "W1AW").unwrap();
     /// record.insert("freq", "14.074").unwrap();
@@ -409,7 +409,7 @@ impl Record {
     /// Create a new header record.
     ///
     /// ```
-    /// use adif::Record;
+    /// use difa::Record;
     /// let mut header = Record::new_header();
     /// header.insert("adifver", "3.1.4").unwrap();
     /// assert!(header.is_header());
@@ -426,7 +426,7 @@ impl Record {
     ///
     /// ```
     /// # tokio_test::block_on(async {
-    /// use adif::RecordStream;
+    /// use difa::RecordStream;
     /// use futures::StreamExt;
     /// let mut s = RecordStream::new(
     ///     "<adifver:5>3.1.4<eoh><call:4>W1AW<eor>".as_bytes(),
@@ -446,7 +446,7 @@ impl Record {
     ///
     /// ```
     /// # tokio_test::block_on(async {
-    /// use adif::RecordStream;
+    /// use difa::RecordStream;
     /// use futures::StreamExt;
     /// let mut s = RecordStream::new(
     ///     "<call:4>W1AW<freq:6>14.074<eor>".as_bytes(),
@@ -473,7 +473,7 @@ impl Record {
     ///
     /// ```
     /// # tokio_test::block_on(async {
-    /// use adif::{Datum, RecordStream};
+    /// use difa::{Datum, RecordStream};
     /// use futures::StreamExt;
     /// let mut s = RecordStream::new("<call:4>W1AW<eor>".as_bytes(), true);
     /// let mut record = s.next().await.unwrap().unwrap();

@@ -47,7 +47,7 @@ impl TagDecoder {
     /// and will not return an error.
     /// ```
     /// # tokio_test::block_on(async {
-    /// use adif::TagDecoder;
+    /// use difa::TagDecoder;
     /// use futures::StreamExt;
     /// let mut t = TagDecoder::new_stream("<FOO:3>123".as_bytes(), true);
     /// let tag = t.next().await.unwrap().unwrap();
@@ -304,7 +304,7 @@ where
     /// and will not return an error.
     /// ```
     /// # tokio_test::block_on(async {
-    /// use adif::RecordStream;
+    /// use difa::RecordStream;
     /// use futures::StreamExt;
     /// let mut r = RecordStream::new("<FOO:3>123<eor>".as_bytes(), true);
     /// let rec = r.next().await.unwrap().unwrap();

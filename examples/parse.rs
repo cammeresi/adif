@@ -1,4 +1,4 @@
-use adif::{NormalizeExt, RecordStream};
+use difa::{NormalizeExt, RecordStream};
 use futures::StreamExt;
 use rust_decimal::prelude::*;
 

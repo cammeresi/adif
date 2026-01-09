@@ -1,5 +1,5 @@
-use adif::{Datum, Error, OutputTypes, Record, RecordSink, RecordStream};
 use chrono::{Days, NaiveDate, NaiveTime};
+use difa::{Datum, Error, OutputTypes, Record, RecordSink, RecordStream};
 use futures::{SinkExt, StreamExt};
 use proptest::prelude::*;
 use rust_decimal::Decimal;

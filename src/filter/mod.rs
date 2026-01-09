@@ -106,8 +106,8 @@ impl<S> FilterExt for S where S: Stream {}
 /// components.  Handle date crossing when time_off is earlier than time_on.
 ///
 /// ```
-/// use adif::filter::normalize_times;
-/// use adif::{Datum, Record, RecordStreamExt, TagDecoder};
+/// use difa::filter::normalize_times;
+/// use difa::{Datum, Record, RecordStreamExt, TagDecoder};
 /// use chrono::{NaiveDate, NaiveTime, Timelike};
 /// use futures::StreamExt;
 ///
@@ -202,7 +202,7 @@ where
 /// Normalize band field to uppercase.
 ///
 /// ```
-/// use adif::{
+/// use difa::{
 ///     Record, RecordStreamExt, TagDecoder, filter::normalize_band,
 /// };
 /// use futures::StreamExt;
@@ -262,7 +262,7 @@ where
 /// Exclude header records from the stream.
 ///
 /// ```
-/// use adif::{
+/// use difa::{
 ///     Record, RecordStreamExt, TagDecoder, filter::exclude_header,
 /// };
 /// use futures::StreamExt;

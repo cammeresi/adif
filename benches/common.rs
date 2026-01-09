@@ -1,5 +1,5 @@
-use adif::{OutputTypes, Record, RecordSink};
 use chrono::{Days, NaiveDate, NaiveTime};
+use difa::{OutputTypes, Record, RecordSink};
 use futures::SinkExt;
 use rust_decimal::Decimal;
 use std::str::FromStr;

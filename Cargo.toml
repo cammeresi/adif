@@ -1,5 +1,5 @@
 [package]
-name = "adif"
+name = "difa"
 version = "0.1.0"
 edition = "2024"
 authors = ["Sidney Cammeresi <sac@cheesecake.org>"]
@@ -7,6 +7,8 @@ license = "BSD-3-Clause"
 readme = "README.md"
 description = "Parsing of Amateur Data Interchange Format (ADIF) files"
 repository = "https://github.com/cammeresi/adif.git"
+keywords = ["hamradio"]
+categories = ["encoding", "parser-implementations"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

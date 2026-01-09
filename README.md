@@ -12,6 +12,9 @@ ADIF is a standard data format used by ham radio operators to exchange
 information logged about past contacts.  This crate provides a few ways to
 parse ADIF data in Rust on top of tokio.
 
+If DIFA needs to stand for something, it stands for Data Interchange Format for
+Amateurs.
+
 [adif]: https://adif.org/
 
 ## Usage
@@ -19,13 +22,13 @@ parse ADIF data in Rust on top of tokio.
 Add the dependency:
 
 ```sh
-cargo add TBD
+cargo add difa
 ```
 
 Then start reading ADIF from any object that implements the AsyncRead trait:
 
 ```rust
-use adif::RecordStream;
+use difa::RecordStream;
 use futures::StreamExt;
 use tokio::{fs::File, io::BufReader};
 

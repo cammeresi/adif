@@ -1,5 +1,5 @@
-use adif::RecordStream;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+use difa::RecordStream;
 use futures::StreamExt;
 use std::hint::black_box;
 

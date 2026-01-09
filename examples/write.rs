@@ -1,4 +1,4 @@
-use adif::{Datum, OutputTypes, Record, RecordSink};
+use difa::{Datum, OutputTypes, Record, RecordSink};
 use futures::SinkExt;
 use rust_decimal::Decimal;
 use std::str::FromStr;

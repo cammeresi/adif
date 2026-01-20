@@ -19,6 +19,7 @@ enum Item {
 struct CabrilloEncoder {
     fields: Vec<String>,
     started: bool,
+    finished: bool,
 }
 
 impl CabrilloEncoder {
@@ -26,6 +27,7 @@ impl CabrilloEncoder {
         Self {
             fields,
             started: false,
+            finished: false,
         }
     }
 
@@ -92,6 +94,10 @@ impl Encoder<Item> for CabrilloEncoder {
                 if !self.started {
                     return Err(Error::MissingHeader);
                 }
+                if self.finished {
+                    return Ok(());
+                }
+                self.finished = true;
                 dst.put_slice(b"END-OF-LOG:\n");
                 Ok(())
             }

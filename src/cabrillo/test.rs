@@ -100,3 +100,17 @@ async fn close_error() {
     let result = sink.close().await;
     assert_eq!(result.unwrap_err(), Error::MissingHeader);
 }
+
+#[tokio::test]
+async fn double_close() {
+    let mut buf = Vec::new();
+    let fields = vec!["call"];
+    let mut sink = CabrilloSink::new(&mut buf, fields);
+
+    let mut header = Record::new_header();
+    header.insert("contest", "TEST").unwrap();
+    sink.send(header).await.unwrap();
+
+    sink.close().await.unwrap();
+    sink.close().await.unwrap();
+}

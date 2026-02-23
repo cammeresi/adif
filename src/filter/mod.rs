@@ -1,6 +1,6 @@
 //! Optional ADIF data transformations
 
-use crate::{Error, Record};
+use crate::{Datum, Error, Record};
 use chrono::{Days, NaiveDateTime};
 use futures::stream::Stream;
 use std::collections::HashSet;
@@ -98,6 +98,48 @@ pub trait FilterExt: Stream {
 }
 
 impl<S> FilterExt for S where S: Stream {}
+
+/// Stream adapter that transforms each record by consuming and rebuilding it.
+pub struct Map<S, F> {
+    stream: S,
+    f: F,
+}
+
+impl<S, F> Stream for Map<S, F>
+where
+    S: Stream<Item = Result<Record, Error>> + Unpin,
+    F: FnMut(Record) -> Result<Record, Error> + Unpin,
+{
+    type Item = Result<Record, Error>;
+
+    fn poll_next(
+        self: Pin<&mut Self>, cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        match Pin::new(&mut this.stream).poll_next(cx) {
+            Poll::Ready(Some(Ok(record))) => {
+                Poll::Ready(Some((this.f)(record)))
+            }
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+/// Extension trait providing the `map` method on streams.
+pub trait MapExt: Stream {
+    /// Transform each record by consuming and rebuilding it.
+    fn map<F>(self, f: F) -> Map<Self, F>
+    where
+        Self: Sized,
+        F: FnMut(Record) -> Result<Record, Error>,
+    {
+        Map { stream: self, f }
+    }
+}
+
+impl<S> MapExt for S where S: Stream {}
 
 /// Normalize date and time fields from multiple possible source fields into
 /// combined datetime values.
@@ -281,4 +323,36 @@ where
     S: Stream<Item = Result<Record, Error>>,
 {
     stream.filter(|record| !record.is_header())
+}
+
+/// Trim leading and trailing whitespace from string field values.
+///
+/// Non-string datum variants pass through unchanged.
+///
+/// ```
+/// use difa::{
+///     Record, RecordStreamExt, TagDecoder, filter::trim_whitespace,
+/// };
+/// use futures::StreamExt;
+///
+/// # tokio_test::block_on(async {
+/// let data = b"<call:6> W1AW <eor>";
+/// let stream = TagDecoder::new_stream(&data[..], true).records();
+/// let mut stream = trim_whitespace(stream);
+/// let record = stream.next().await.unwrap().unwrap();
+/// assert_eq!(record.get("call").unwrap().as_str(), "W1AW");
+/// # });
+/// ```
+pub fn trim_whitespace<S>(
+    stream: S,
+) -> Map<S, impl FnMut(Record) -> Result<Record, Error>>
+where
+    S: Stream<Item = Result<Record, Error>>,
+{
+    stream.map(|r| {
+        Ok(r.map_fields(|_, v| match v {
+            Datum::String(s) => Datum::String(s.trim().to_string()),
+            other => other,
+        }))
+    })
 }

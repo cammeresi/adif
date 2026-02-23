@@ -456,3 +456,65 @@ async fn filter_end_of_stream() {
     assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
     no_record(&mut s).await;
 }
+
+#[tokio::test]
+async fn trim_whitespace_trims_strings() {
+    let rec = parse_one("<call:6> W1AW <eor>", trim_whitespace).await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
+}
+
+#[tokio::test]
+async fn trim_whitespace_no_change() {
+    let rec = parse_one("<call:4>W1AW<eor>", trim_whitespace).await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
+}
+
+#[tokio::test]
+async fn trim_whitespace_preserves_typed_values() {
+    let rec =
+        parse_one("<n:5:n> 1.0 <b:3:b> Y <call:6> W1AW <eor>", trim_whitespace)
+            .await;
+    assert_eq!(
+        rec.get("n").unwrap().as_number().unwrap().to_string(),
+        "1.0"
+    );
+    assert!(rec.get("b").unwrap().as_bool().unwrap());
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
+}
+
+#[tokio::test]
+async fn trim_whitespace_preserves_header() {
+    let mut s = parse_many(
+        "<adifver:7> 3.1.4 <eoh><call:6> W1AW <eor>",
+        trim_whitespace,
+    );
+    let rec = next(&mut s).await;
+    assert!(rec.is_header());
+    assert_eq!(rec.get("adifver").unwrap().as_str(), "3.1.4");
+    let rec = next(&mut s).await;
+    assert!(!rec.is_header());
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
+    no_record(&mut s).await;
+}
+
+#[tokio::test]
+async fn trim_whitespace_multiple_fields() {
+    let rec = parse_one(
+        "<call:6> W1AW <band:5> 20m <mode:5> SSB <eor>",
+        trim_whitespace,
+    )
+    .await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
+    assert_eq!(rec.get("band").unwrap().as_str(), "20m");
+    assert_eq!(rec.get("mode").unwrap().as_str(), "SSB");
+}
+
+#[tokio::test]
+async fn trim_whitespace_error_passthrough() {
+    let mut s =
+        parse_many_ignore("<call:6> W1AW <eor><bad", false, trim_whitespace);
+    let rec = next(&mut s).await;
+    assert_eq!(rec.get("call").unwrap().as_str(), "W1AW");
+    next_err(&mut s, partial_data(1, 20, 19)).await;
+    no_record(&mut s).await;
+}

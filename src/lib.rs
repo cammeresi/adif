@@ -28,7 +28,7 @@ mod test;
 
 pub use cabrillo::CabrilloSink;
 pub use cistring::{CiStr, CiString};
-pub use filter::{FilterExt, NormalizeExt};
+pub use filter::{FilterExt, MapExt, NormalizeExt};
 pub use parse::{RecordStream, RecordStreamExt, TagDecoder, TagStream};
 pub use write::{OutputTypes, RecordSink, TagEncoder, TagSink, TagSinkExt};
 
@@ -507,6 +507,25 @@ impl Record {
     /// Consume the record and return an iterator over owned fields.
     pub fn into_fields(self) -> impl Iterator<Item = (String, Datum)> {
         self.fields.into_iter().map(|(k, v)| (k.into_string(), v))
+    }
+
+    /// Rebuild a record by applying a transformation to each field.
+    pub fn map_fields<F>(self, mut f: F) -> Self
+    where
+        F: FnMut(&str, Datum) -> Datum,
+    {
+        let fields = self
+            .fields
+            .into_iter()
+            .map(|(k, v)| {
+                let v = f(k.as_str(), v);
+                (k, v)
+            })
+            .collect();
+        Self {
+            header: self.header,
+            fields,
+        }
     }
 
     /// Return an iterator over all fields in this record.

@@ -195,6 +195,36 @@ fn into_fields() {
 }
 
 #[test]
+fn map_fields() {
+    let mut r = Record::new();
+    r.insert("call", " W1AW ").unwrap();
+    r.insert("freq", Decimal::from(14)).unwrap();
+
+    let r = r.map_fields(|_, v| match v {
+        Datum::String(s) => Datum::String(s.trim().to_string()),
+        other => other,
+    });
+    assert_eq!(r.get("call").unwrap().as_str(), "W1AW");
+    assert_eq!(
+        r.get("freq").unwrap().as_number().unwrap(),
+        Decimal::from(14)
+    );
+}
+
+#[test]
+fn map_fields_header() {
+    let mut r = Record::new_header();
+    r.insert("adifver", " 3.1.4 ").unwrap();
+    r.insert("foo", true).unwrap();
+    let r = r.map_fields(|_, v| match v {
+        Datum::String(s) => Datum::String(s.trim().to_string()),
+        other => other,
+    });
+    assert!(r.is_header());
+    assert_eq!(r.get("adifver").unwrap().as_str(), "3.1.4");
+}
+
+#[test]
 fn to_cabrillo() {
     let s = Datum::String("test".to_string());
     assert_eq!(s.to_cabrillo(), "test");

@@ -212,7 +212,7 @@ pub fn normalize_mode<S>(
 where
     S: Stream<Item = Result<Record, Error>>,
 {
-    const MFSK_SUBMODES: &[&str] = &["FT4", "Q65"];
+    const MFSK_SUBMODES: &[&str] = &["FT2", "FT4", "Q65"];
     const MODE: &str = ":mode";
 
     stream.normalize(|record| {

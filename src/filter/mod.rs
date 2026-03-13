@@ -271,13 +271,7 @@ where
             return Ok(());
         };
 
-        let band =
-            if band.chars().all(|c| c.is_uppercase() || !c.is_alphabetic()) {
-                band.to_string()
-            } else {
-                band.to_uppercase()
-            };
-        record.insert(BAND, band)
+        record.insert(BAND, band.to_uppercase())
     })
 }
 

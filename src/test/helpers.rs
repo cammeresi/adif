@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use futures::Stream;
-use tokio::io::{AsyncRead, ReadBuf};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::{Error, Position, Record};
 
@@ -76,6 +76,51 @@ impl AsyncRead for TrickleReader {
         buf.put_slice(&self.data[self.pos..self.pos + to_read]);
         self.pos += to_read;
         self.delayed = false;
+        Poll::Ready(Ok(()))
+    }
+}
+
+pub(crate) struct TrickleWriter {
+    buf: Vec<u8>,
+    chunk: usize,
+    delayed: bool,
+}
+
+impl TrickleWriter {
+    pub(crate) fn new(chunk: usize) -> Self {
+        Self {
+            buf: Vec::new(),
+            chunk,
+            delayed: false,
+        }
+    }
+}
+
+impl AsyncWrite for TrickleWriter {
+    fn poll_write(
+        mut self: Pin<&mut Self>, cx: &mut Context<'_>, src: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        if !self.delayed {
+            self.delayed = true;
+            cx.waker().wake_by_ref();
+            return Poll::Pending;
+        }
+
+        let n = src.len().min(self.chunk);
+        self.buf.extend_from_slice(&src[..n]);
+        self.delayed = false;
+        Poll::Ready(Ok(n))
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>, _cx: &mut Context<'_>,
+    ) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        self: Pin<&mut Self>, _cx: &mut Context<'_>,
+    ) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 }

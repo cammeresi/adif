@@ -1,6 +1,10 @@
+use std::pin::Pin;
 use std::str::FromStr;
+use std::task::Poll;
 
 use chrono::{NaiveDate, NaiveTime};
+use futures::future::poll_fn;
+use futures::sink::Sink;
 use futures::{SinkExt, StreamExt};
 use rust_decimal::Decimal;
 
@@ -278,4 +282,73 @@ async fn encode_datetime_record_fails() {
         err,
         cannot_output("DateTime", "split into date and time fields")
     );
+}
+
+#[tokio::test]
+async fn poll_ready_backpressure() {
+    let w = TrickleWriter::new(64);
+    let mut sink = RecordSink::new(w);
+
+    // Fill buffer past the 8192-byte backpressure boundary.
+    let big = "x".repeat(9000);
+    let mut record = Record::new();
+    record.insert("data", big.as_str()).unwrap();
+    poll_fn(|cx| -> Poll<Result<(), _>> {
+        assert!(Pin::new(&mut sink).poll_ready(cx).is_ready());
+        Poll::Ready(Pin::new(&mut sink).start_send(record.clone()))
+    })
+    .await
+    .unwrap();
+
+    // TrickleWriter is in delayed state so flush can't proceed;
+    // poll_ready must propagate Pending.
+    let pending = poll_fn(|cx| {
+        Poll::Ready(Pin::new(&mut sink).poll_ready(cx).is_pending())
+    })
+    .await;
+    assert!(pending);
+}
+
+#[tokio::test]
+async fn poll_flush_backpressure() {
+    let w = TrickleWriter::new(64);
+    let mut sink = RecordSink::new(w);
+
+    let mut record = Record::new();
+    record.insert("call", "W1AW").unwrap();
+    poll_fn(|cx| -> Poll<Result<(), _>> {
+        assert!(Pin::new(&mut sink).poll_ready(cx).is_ready());
+        Poll::Ready(Pin::new(&mut sink).start_send(record.clone()))
+    })
+    .await
+    .unwrap();
+
+    // First poll_flush triggers poll_write which returns Pending.
+    let pending = poll_fn(|cx| {
+        Poll::Ready(Pin::new(&mut sink).poll_flush(cx).is_pending())
+    })
+    .await;
+    assert!(pending);
+}
+
+#[tokio::test]
+async fn poll_close_backpressure() {
+    let w = TrickleWriter::new(64);
+    let mut sink = RecordSink::new(w);
+
+    let mut record = Record::new();
+    record.insert("call", "W1AW").unwrap();
+    poll_fn(|cx| -> Poll<Result<(), _>> {
+        assert!(Pin::new(&mut sink).poll_ready(cx).is_ready());
+        Poll::Ready(Pin::new(&mut sink).start_send(record.clone()))
+    })
+    .await
+    .unwrap();
+
+    // poll_close flushes first, which triggers poll_write → Pending.
+    let pending = poll_fn(|cx| {
+        Poll::Ready(Pin::new(&mut sink).poll_close(cx).is_pending())
+    })
+    .await;
+    assert!(pending);
 }

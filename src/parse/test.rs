@@ -1,7 +1,10 @@
+use std::str::FromStr;
+
+use bytes::BytesMut;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use futures::StreamExt;
 use rust_decimal::Decimal;
-use std::str::FromStr;
+use tokio_util::codec::Decoder;
 
 use super::*;
 use crate::test::helpers::*;
@@ -707,6 +710,19 @@ async fn err_pos_skips_newlines() {
     let mut f = RecordStream::new(bytes as &[u8], true);
     let err = f.next().await.unwrap().unwrap_err();
     assert_eq!(err, invalid_format("bar:2", 2, 1, 10));
+}
+
+#[tokio::test]
+async fn decode_returns_tag_before_eof() {
+    let mut dec = TagDecoder {
+        ignore_partial: true,
+        consumed: 0,
+        line: 1,
+        column: 1,
+    };
+    let mut buf = BytesMut::from("<foo:3>bar");
+    let tag = Decoder::decode(&mut dec, &mut buf).unwrap();
+    assert!(matches!(tag, Some(Tag::Field(_))));
 }
 
 #[tokio::test]

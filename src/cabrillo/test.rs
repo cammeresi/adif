@@ -1,6 +1,12 @@
+use std::pin::Pin;
+use std::task::Poll;
+
 use chrono::{NaiveDate, NaiveTime};
 use futures::SinkExt;
+use futures::future::poll_fn;
+use futures::sink::Sink;
 
+use crate::test::helpers::TrickleWriter;
 use crate::{CabrilloSink, Error, Record};
 
 #[tokio::test]
@@ -113,4 +119,59 @@ async fn double_close() {
 
     sink.close().await.unwrap();
     sink.close().await.unwrap();
+}
+
+fn trickle_sink() -> CabrilloSink<TrickleWriter> {
+    let fields = vec!["call"];
+    CabrilloSink::new(TrickleWriter::new(64), fields)
+}
+
+async fn send_header(sink: &mut CabrilloSink<TrickleWriter>) {
+    let mut h = Record::new_header();
+    h.insert("contest", "TEST").unwrap();
+    sink.send(h).await.unwrap();
+}
+
+#[tokio::test]
+async fn poll_ready_backpressure() {
+    let mut sink = trickle_sink();
+    send_header(&mut sink).await;
+
+    // Buffer a QSO record via start_send, filling past backpressure boundary.
+    let big = "x".repeat(9000);
+    let mut qso = Record::new();
+    qso.insert("call", big.as_str()).unwrap();
+    poll_fn(|cx| -> Poll<Result<(), _>> {
+        assert!(Pin::new(&mut sink).poll_ready(cx).is_ready());
+        Poll::Ready(Pin::new(&mut sink).start_send(qso.clone()))
+    })
+    .await
+    .unwrap();
+
+    let pending = poll_fn(|cx| {
+        Poll::Ready(Pin::new(&mut sink).poll_ready(cx).is_pending())
+    })
+    .await;
+    assert!(pending);
+}
+
+#[tokio::test]
+async fn poll_flush_backpressure() {
+    let mut sink = trickle_sink();
+    send_header(&mut sink).await;
+
+    let mut qso = Record::new();
+    qso.insert("call", "W1AW").unwrap();
+    poll_fn(|cx| -> Poll<Result<(), _>> {
+        assert!(Pin::new(&mut sink).poll_ready(cx).is_ready());
+        Poll::Ready(Pin::new(&mut sink).start_send(qso.clone()))
+    })
+    .await
+    .unwrap();
+
+    let pending = poll_fn(|cx| {
+        Poll::Ready(Pin::new(&mut sink).poll_flush(cx).is_pending())
+    })
+    .await;
+    assert!(pending);
 }

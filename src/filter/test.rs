@@ -219,7 +219,7 @@ async fn normalize_band_duplicate_key() {
 }
 
 #[tokio::test]
-async fn normalize_times_duplicate_key() {
+async fn normalize_times_many() {
     let mut count = 0;
     let mut s = parse_many(
         "<qso_date:8>20240101<time_on:6>120000<eor>
@@ -230,6 +230,7 @@ async fn normalize_times_duplicate_key() {
          <qso_date:8>20231215<time_on:6>233000<time_off:6>001500<eor>
          <qso_date:8>20231215<time_on:6>233000<qso_date_off:8>20231216<time_off:6>013000<eor>
          <qso_date:8>20231231<time_on:6>233000<qso_date_off:8>20240101<time_off:6>003000<eor>
+         <qso_date:8>20231231<time_on:6>233000<time_off:6>233000<eor>
          <qso_date:8>20231215<eor>",
         |s| {
             normalize_times(s.normalize(move |r| {
@@ -294,6 +295,13 @@ async fn normalize_times_duplicate_key() {
         &rec,
         dt(2023, 12, 31, 23, 30, 0),
         dt(2024, 1, 1, 0, 30, 0),
+    );
+
+    let rec = next(&mut s).await;
+    assert_both_times(
+        &rec,
+        dt(2023, 12, 31, 23, 30, 0),
+        dt(2023, 12, 31, 23, 30, 0),
     );
 
     let rec = next(&mut s).await;

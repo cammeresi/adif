@@ -106,12 +106,17 @@ concrete instantiation.  (For function `Foo<T>::bar`, there exists at
 least one `T` for which the tests test every possible path through `bar`.)
 
 These facts are verified by both `cargo llvm-cov` and codecov.io (badge
-at top) across over 4500 code regions.  The nightly toolchain may be
+at top) across over 5000 code regions.  The nightly toolchain may be
 used to verify branch coverage.
+
+[[Mutation testing][mutation]] via `cargo mutants` shows that any change
+to the code causes a test failure, i.e. any change of code causes a
+change in the output.
 
 > I reviewed your flight plan.  Not one error in a million keystrokes.
 > Phenomenal.  [[Gattaca, 1997][gattaca]]
 
+[mutation]: https://en.wikipedia.org/wiki/Mutation_testing
 [gattaca]: https://en.wikipedia.org/wiki/Gattaca
 
 Additionally, each of the property-based tests has run over one million

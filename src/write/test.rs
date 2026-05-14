@@ -351,4 +351,7 @@ async fn poll_close_backpressure() {
     })
     .await;
     assert!(pending);
+
+    // Drive close to completion, which reaches poll_shutdown.
+    sink.close().await.unwrap();
 }

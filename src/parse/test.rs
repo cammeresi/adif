@@ -722,7 +722,7 @@ async fn decode_returns_tag_before_eof() {
     };
     let mut buf = BytesMut::from("<foo:3>bar");
     let tag = Decoder::decode(&mut dec, &mut buf).unwrap();
-    assert!(matches!(tag, Some(Tag::Field(_))));
+    assert_eq!(tag, Some(Tag::Field(Field::new("foo", "bar"))));
 }
 
 #[tokio::test]

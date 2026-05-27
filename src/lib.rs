@@ -8,8 +8,8 @@
 #![doc = include_str!("../README.md")]
 // #![cfg_attr(feature = "nightly", feature(coverage_attribute))]
 
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use indexmap::{IndexMap, map::Entry};
+use jiff::civil::{Date, DateTime, Time};
 use rust_decimal::Decimal;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
@@ -165,9 +165,9 @@ pub enum Datum {
     /// Numeric value (type indicator `n` in ADIF tags).
     Number(Decimal),
     /// Date value (type indicator `d` in ADIF tags), format YYYYMMDD.
-    Date(NaiveDate),
+    Date(Date),
     /// Time value (type indicator `t` in ADIF tags), format HHMMSS.
-    Time(NaiveTime),
+    Time(Time),
     /// Combined date and time value.
     ///
     /// This type is not part of the ADIF specification, but it provided as
@@ -178,7 +178,7 @@ pub enum Datum {
     /// writer is configured to not output a type indicator for the datetime
     /// field.  Attempting to output a datetime with a type indicator will
     /// return an error.
-    DateTime(NaiveDateTime),
+    DateTime(DateTime),
     /// String value (default when no type indicator is present).
     String(String),
 }
@@ -214,37 +214,35 @@ impl Datum {
         }
     }
 
-    /// Return a date value as a [NaiveDate] or coerce a string thereto.
+    /// Return a date value as a [Date] or coerce a string thereto.
     ///
     /// Returns [None] if a string value fails to parse.
-    pub fn as_date(&self) -> Option<NaiveDate> {
+    pub fn as_date(&self) -> Option<Date> {
         match self {
             Self::Date(d) => Some(*d),
-            Self::String(s) => NaiveDate::parse_from_str(s, "%Y%m%d").ok(),
+            Self::String(s) => Date::strptime("%Y%m%d", s).ok(),
             _ => None,
         }
     }
 
-    /// Return a time value as a [NaiveTime] or coerce a string thereto.
+    /// Return a time value as a [Time] or coerce a string thereto.
     ///
     /// Returns [None] if a string value fails to parse.
-    pub fn as_time(&self) -> Option<NaiveTime> {
+    pub fn as_time(&self) -> Option<Time> {
         match self {
             Self::Time(t) => Some(*t),
-            Self::String(s) => NaiveTime::parse_from_str(s, "%H%M%S").ok(),
+            Self::String(s) => Time::strptime("%H%M%S", s).ok(),
             _ => None,
         }
     }
 
-    /// Return a datetime value as a [NaiveDateTime] or coerce a string thereto.
+    /// Return a datetime value as a [DateTime] or coerce a string thereto.
     ///
     /// Returns [None] if a string value fails to parse.
-    pub fn as_datetime(&self) -> Option<NaiveDateTime> {
+    pub fn as_datetime(&self) -> Option<DateTime> {
         match self {
             Self::DateTime(dt) => Some(*dt),
-            Self::String(s) => {
-                NaiveDateTime::parse_from_str(s, "%Y%m%d %H%M%S").ok()
-            }
+            Self::String(s) => DateTime::strptime("%Y%m%d %H%M%S", s).ok(),
             _ => None,
         }
     }
@@ -258,10 +256,10 @@ impl Datum {
             Self::String(s) => Cow::Borrowed(s),
             Self::Boolean(b) => Cow::Borrowed(Self::bool_str(*b)),
             Self::Number(n) => Cow::Owned(n.to_string()),
-            Self::Date(d) => Cow::Owned(d.format("%Y%m%d").to_string()),
-            Self::Time(t) => Cow::Owned(t.format("%H%M%S").to_string()),
+            Self::Date(d) => Cow::Owned(d.strftime("%Y%m%d").to_string()),
+            Self::Time(t) => Cow::Owned(t.strftime("%H%M%S").to_string()),
             Self::DateTime(dt) => {
-                Cow::Owned(dt.format("%Y%m%d %H%M%S").to_string())
+                Cow::Owned(dt.strftime("%Y%m%d %H%M%S").to_string())
             }
         }
     }
@@ -272,10 +270,10 @@ impl Datum {
             Self::String(s) => Cow::Borrowed(s),
             Self::Boolean(b) => Cow::Borrowed(Self::bool_str(*b)),
             Self::Number(n) => Cow::Owned(n.to_string()),
-            Self::Date(d) => Cow::Owned(d.format("%Y-%m-%d").to_string()),
-            Self::Time(t) => Cow::Owned(t.format("%H%M").to_string()),
+            Self::Date(d) => Cow::Owned(d.strftime("%Y-%m-%d").to_string()),
+            Self::Time(t) => Cow::Owned(t.strftime("%H%M").to_string()),
             Self::DateTime(dt) => {
-                Cow::Owned(dt.format("%Y-%m-%d %H%M").to_string())
+                Cow::Owned(dt.strftime("%Y-%m-%d %H%M").to_string())
             }
         }
     }
@@ -305,20 +303,20 @@ impl From<Decimal> for Datum {
     }
 }
 
-impl From<NaiveDate> for Datum {
-    fn from(value: NaiveDate) -> Self {
+impl From<Date> for Datum {
+    fn from(value: Date) -> Self {
         Datum::Date(value)
     }
 }
 
-impl From<NaiveTime> for Datum {
-    fn from(value: NaiveTime) -> Self {
+impl From<Time> for Datum {
+    fn from(value: Time) -> Self {
         Datum::Time(value)
     }
 }
 
-impl From<NaiveDateTime> for Datum {
-    fn from(value: NaiveDateTime) -> Self {
+impl From<DateTime> for Datum {
+    fn from(value: DateTime) -> Self {
         Datum::DateTime(value)
     }
 }

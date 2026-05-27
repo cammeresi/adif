@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use bytes::BytesMut;
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use futures::StreamExt;
+use jiff::civil::{Date, DateTime, Time};
 use rust_decimal::Decimal;
 use tokio_util::codec::Decoder;
 
@@ -130,37 +130,25 @@ async fn typed() {
     let mut f = tags("<qso_date:8:d>20240101");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "qso_date");
-    assert_eq!(
-        field.value(),
-        &Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap())
-    );
+    assert_eq!(field.value(), &Datum::Date(Date::new(2024, 1, 1).unwrap()));
     no_tags(&mut f).await;
 
     let mut f = tags("<qso_date:8:D>20240101");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "qso_date");
-    assert_eq!(
-        field.value(),
-        &Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap())
-    );
+    assert_eq!(field.value(), &Datum::Date(Date::new(2024, 1, 1).unwrap()));
     no_tags(&mut f).await;
 
     let mut f = tags("<time_on:6:t>230000");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "time_on");
-    assert_eq!(
-        field.value(),
-        &Datum::Time(NaiveTime::from_hms_opt(23, 0, 0).unwrap())
-    );
+    assert_eq!(field.value(), &Datum::Time(Time::new(23, 0, 0, 0).unwrap()));
     no_tags(&mut f).await;
 
     let mut f = tags("<time_on:6:T>230000");
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "time_on");
-    assert_eq!(
-        field.value(),
-        &Datum::Time(NaiveTime::from_hms_opt(23, 0, 0).unwrap())
-    );
+    assert_eq!(field.value(), &Datum::Time(Time::new(23, 0, 0, 0).unwrap()));
     no_tags(&mut f).await;
 }
 
@@ -214,14 +202,14 @@ async fn trim_typed() {
     assert_eq!(field.name(), "c");
     assert_eq!(
         field.value().as_date().unwrap(),
-        NaiveDate::from_ymd_opt(2020, 1, 1).unwrap()
+        Date::new(2020, 1, 1).unwrap()
     );
 
     let field = next_field(&mut f).await;
     assert_eq!(field.name(), "d");
     assert_eq!(
         field.value().as_time().unwrap(),
-        NaiveTime::from_hms_opt(12, 34, 56).unwrap()
+        Time::new(12, 34, 56, 0).unwrap()
     );
 
     no_tags(&mut f).await;
@@ -421,7 +409,7 @@ async fn coerce_date_from_string() {
     let mut f = RecordStream::new("<qso_date:8>20231215<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     let date = rec.get("qso_date").unwrap().as_date().unwrap();
-    assert_eq!(date, NaiveDate::from_ymd_opt(2023, 12, 15).unwrap());
+    assert_eq!(date, Date::new(2023, 12, 15).unwrap());
 }
 
 #[tokio::test]
@@ -429,7 +417,7 @@ async fn coerce_time_from_string() {
     let mut f = RecordStream::new("<time_on:6>143000<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     let time = rec.get("time_on").unwrap().as_time().unwrap();
-    assert_eq!(time, NaiveTime::from_hms_opt(14, 30, 0).unwrap());
+    assert_eq!(time, Time::new(14, 30, 0, 0).unwrap());
 }
 
 #[tokio::test]
@@ -438,9 +426,9 @@ async fn coerce_datetime_from_string() {
         RecordStream::new("<dt:15>20240101 143000<eor>".as_bytes(), true);
     let rec = next_record(&mut f, false).await;
     let dt = rec.get("dt").unwrap().as_datetime().unwrap();
-    let expected = NaiveDateTime::new(
-        NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
-        NaiveTime::from_hms_opt(14, 30, 0).unwrap(),
+    let expected = DateTime::from_parts(
+        Date::new(2024, 1, 1).unwrap(),
+        Time::new(14, 30, 0, 0).unwrap(),
     );
     assert_eq!(dt, expected);
 }
@@ -546,19 +534,19 @@ async fn as_str_roundtrip() {
     let s = datum.as_str();
     assert_eq!(Datum::String(s.to_string()).as_number().unwrap(), n);
 
-    let d = NaiveDate::from_ymd_opt(2023, 12, 15).unwrap();
+    let d = Date::new(2023, 12, 15).unwrap();
     let datum = Datum::Date(d);
     let s = datum.as_str();
     assert_eq!(s, "20231215");
     assert_eq!(Datum::String(s.to_string()).as_date().unwrap(), d);
 
-    let t = NaiveTime::from_hms_opt(14, 30, 0).unwrap();
+    let t = Time::new(14, 30, 0, 0).unwrap();
     let datum = Datum::Time(t);
     let s = datum.as_str();
     assert_eq!(s, "143000");
     assert_eq!(Datum::String(s.to_string()).as_time().unwrap(), t);
 
-    let dt = NaiveDateTime::new(d, t);
+    let dt = DateTime::from_parts(d, t);
     let datum = Datum::DateTime(dt);
     let s = datum.as_str();
     assert_eq!(s, "20231215 143000");

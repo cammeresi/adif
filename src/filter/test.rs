@@ -1,17 +1,15 @@
-use chrono::{NaiveDate, NaiveDateTime};
 use futures::StreamExt;
+use jiff::civil::{Date, DateTime, Time};
 
 use super::*;
 use crate::parse::{RecordStream, TagStream};
 use crate::test::helpers::*;
 
-fn dt(
-    year: i32, month: u32, day: u32, hour: u32, min: u32, sec: u32,
-) -> NaiveDateTime {
-    NaiveDate::from_ymd_opt(year, month, day)
-        .unwrap()
-        .and_hms_opt(hour, min, sec)
-        .unwrap()
+fn dt(year: i16, month: i8, day: i8, hour: i8, min: i8, sec: i8) -> DateTime {
+    DateTime::from_parts(
+        Date::new(year, month, day).unwrap(),
+        Time::new(hour, min, sec, 0).unwrap(),
+    )
 }
 
 async fn next<S>(stream: &mut S) -> Record
@@ -35,14 +33,14 @@ where
     assert!(stream.next().await.is_none());
 }
 
-fn assert_time_on_only(rec: &Record, expected_on: NaiveDateTime) {
+fn assert_time_on_only(rec: &Record, expected_on: DateTime) {
     let time_on = rec.get(":time_on").unwrap().as_datetime().unwrap();
     assert_eq!(time_on, expected_on);
     assert!(rec.get(":time_off").is_none());
 }
 
 fn assert_both_times(
-    rec: &Record, expected_on: NaiveDateTime, expected_off: NaiveDateTime,
+    rec: &Record, expected_on: DateTime, expected_off: DateTime,
 ) {
     let time_on = rec.get(":time_on").unwrap().as_datetime().unwrap();
     assert_eq!(time_on, expected_on);
@@ -307,7 +305,7 @@ async fn normalize_times_many() {
     let rec = next(&mut s).await;
     assert_eq!(
         rec.get("qso_date").unwrap().as_date().unwrap(),
-        NaiveDate::from_ymd_opt(2023, 12, 15).unwrap()
+        Date::new(2023, 12, 15).unwrap()
     );
     assert!(rec.get("time_on").is_none());
     assert!(rec.get("time_off").is_none());

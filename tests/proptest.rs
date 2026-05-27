@@ -1,6 +1,7 @@
-use chrono::{Days, NaiveDate, NaiveTime};
 use difa::{Datum, Error, OutputTypes, Record, RecordSink, RecordStream};
 use futures::{SinkExt, StreamExt};
+use jiff::Span;
+use jiff::civil::{Date, Time};
 use proptest::prelude::*;
 use rust_decimal::Decimal;
 
@@ -49,18 +50,19 @@ fn number_datum_strategy() -> impl Strategy<Value = Datum> {
 }
 
 fn date_datum_strategy() -> impl Strategy<Value = Datum> {
-    let base = NaiveDate::from_ymd_opt(1900, 1, 1).unwrap();
+    let base = Date::new(1900, 1, 1).unwrap();
     let max = 200 * 365 + 50; // 200 years + 50 leap days
 
-    (0u64..=max).prop_filter_map("valid date", move |days| {
-        base.checked_add_days(Days::new(days)).map(Datum::Date)
+    (0i64..=max as i64).prop_filter_map("valid date", move |days| {
+        base.checked_add(Span::new().days(days))
+            .ok()
+            .map(Datum::Date)
     })
 }
 
 fn time_datum_strategy() -> impl Strategy<Value = Datum> {
-    (0u32..24, 0u32..60, 0u32..60).prop_map(|(h, m, s)| {
-        Datum::Time(NaiveTime::from_hms_opt(h, m, s).unwrap())
-    })
+    (0i8..24, 0i8..60, 0i8..60)
+        .prop_map(|(h, m, s)| Datum::Time(Time::new(h, m, s, 0).unwrap()))
 }
 
 fn datum_strategy(whitespace: bool) -> impl Strategy<Value = Datum> {

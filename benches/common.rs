@@ -1,6 +1,7 @@
-use chrono::{Days, NaiveDate, NaiveTime};
 use difa::{OutputTypes, Record, RecordSink};
 use futures::SinkExt;
+use jiff::Span;
+use jiff::civil::{Date, Time};
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
@@ -71,8 +72,8 @@ fn header() -> Result<Record, Box<dyn std::error::Error>> {
     Ok(h)
 }
 
-fn time(h: u32, m: u32, s: u32) -> NaiveTime {
-    NaiveTime::from_hms_opt(h, m, s).unwrap()
+fn time(h: i8, m: i8, s: i8) -> Time {
+    Time::new(h, m, s, 0).unwrap()
 }
 
 fn qso(i: usize) -> Result<Record, Box<dyn std::error::Error>> {
@@ -80,18 +81,20 @@ fn qso(i: usize) -> Result<Record, Box<dyn std::error::Error>> {
 
     r.insert("call", call(i))?;
 
-    let base = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
-    let date = base.checked_add_days(Days::new((i % 365) as u64)).unwrap();
+    let base = Date::new(2024, 1, 1).unwrap();
+    let date = base
+        .checked_add(Span::new().days((i % 365) as i64))
+        .unwrap();
     r.insert("qso_date", date)?;
-    let date_off = date.checked_add_days(Days::new((i % 3) as u64)).unwrap();
+    let date_off = date.checked_add(Span::new().days((i % 3) as i64)).unwrap();
     r.insert("qso_date_off", date_off)?;
 
-    let h = (i % 24) as u32;
-    let m = (i % 60) as u32;
-    let s = ((i * 7) % 60) as u32;
+    let h = (i % 24) as i8;
+    let m = (i % 60) as i8;
+    let s = ((i * 7) % 60) as i8;
     r.insert("time_on", time(h, m, s))?;
     let h = (h + 1) % 24;
-    let m = (m + ((i % 15) as u32)) % 60;
+    let m = (m + (i % 15) as i8) % 60;
     r.insert("time_off", time(h, m, s))?;
 
     let band = BANDS[i % BANDS.len()];

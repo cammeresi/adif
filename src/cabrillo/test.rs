@@ -1,10 +1,10 @@
 use std::pin::Pin;
 use std::task::Poll;
 
-use chrono::{NaiveDate, NaiveTime};
 use futures::SinkExt;
 use futures::future::poll_fn;
 use futures::sink::Sink;
+use jiff::civil::{Date, Time};
 
 use crate::test::helpers::TrickleWriter;
 use crate::{CabrilloSink, Error, Record};
@@ -23,9 +23,9 @@ async fn basic() {
     let mut qso = Record::new();
     qso.insert("freq", "14000").unwrap();
     qso.insert("mode", "CW").unwrap();
-    qso.insert("qso_date", NaiveDate::from_ymd_opt(2020, 1, 1).unwrap())
+    qso.insert("qso_date", Date::new(2020, 1, 1).unwrap())
         .unwrap();
-    qso.insert("time_on", NaiveTime::from_hms_opt(12, 34, 0).unwrap())
+    qso.insert("time_on", Time::new(12, 34, 0, 0).unwrap())
         .unwrap();
     qso.insert("call", "AB9BH").unwrap();
     sink.send(qso).await.unwrap();

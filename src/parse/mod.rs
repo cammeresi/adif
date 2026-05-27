@@ -2,8 +2,8 @@
 
 use crate::{Datum, Error, Field, Position, Record, Tag};
 use bytes::{Buf, BytesMut};
-use chrono::{NaiveDate, NaiveTime};
 use futures::stream::Stream;
+use jiff::civil::{Date, Time};
 use rust_decimal::Decimal;
 use std::borrow::Cow;
 use std::pin::Pin;
@@ -119,12 +119,12 @@ impl TagDecoder {
                 Ok(Datum::Boolean(b))
             }
             Some("d") | Some("D") => {
-                let date = NaiveDate::parse_from_str(v.trim(), "%Y%m%d")
+                let date = Date::strptime("%Y%m%d", v.trim())
                     .map_err(|_| self.invalid_tag(tag))?;
                 Ok(Datum::Date(date))
             }
             Some("t") | Some("T") => {
-                let time = NaiveTime::parse_from_str(v.trim(), "%H%M%S")
+                let time = Time::strptime("%H%M%S", v.trim())
                     .map_err(|_| self.invalid_tag(tag))?;
                 Ok(Datum::Time(time))
             }

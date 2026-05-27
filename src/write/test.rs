@@ -2,10 +2,10 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::task::Poll;
 
-use chrono::{NaiveDate, NaiveTime};
 use futures::future::poll_fn;
 use futures::sink::Sink;
 use futures::{SinkExt, StreamExt};
+use jiff::civil::{Date, DateTime, Time};
 use rust_decimal::Decimal;
 
 use super::{RecordSink, TagEncoder, TagSinkExt};
@@ -93,7 +93,7 @@ async fn encode_number() {
 #[tokio::test]
 async fn encode_date() {
     encode_field(
-        NaiveDate::from_ymd_opt(2024, 1, 15).unwrap().into(),
+        Date::new(2024, 1, 15).unwrap().into(),
         "<f:8:d>20240115",
         "<f:8:d>20240115",
         "<f:8>20240115",
@@ -104,7 +104,7 @@ async fn encode_date() {
 #[tokio::test]
 async fn encode_time() {
     encode_field(
-        NaiveTime::from_hms_opt(14, 30, 0).unwrap().into(),
+        Time::new(14, 30, 0, 0).unwrap().into(),
         "<f:6:t>143000",
         "<f:6:t>143000",
         "<f:6>143000",
@@ -121,10 +121,10 @@ async fn encode_string() {
 async fn datetime_errors() {
     let field = Field::new(
         "timestamp",
-        NaiveDate::from_ymd_opt(2024, 1, 15)
-            .unwrap()
-            .and_hms_opt(14, 30, 0)
-            .unwrap(),
+        DateTime::from_parts(
+            Date::new(2024, 1, 15).unwrap(),
+            Time::new(14, 30, 0, 0).unwrap(),
+        ),
     );
     let mut buf = Vec::new();
     let mut sink = TagEncoder::new().tag_sink_with(&mut buf);
@@ -137,10 +137,10 @@ async fn datetime_errors() {
 
 #[tokio::test]
 async fn encode_datetime_field_fails() {
-    let dt = NaiveDate::from_ymd_opt(2024, 1, 15)
-        .unwrap()
-        .and_hms_opt(14, 30, 45)
-        .unwrap();
+    let dt = DateTime::from_parts(
+        Date::new(2024, 1, 15).unwrap(),
+        Time::new(14, 30, 45, 0).unwrap(),
+    );
     let field = Field::new("qso_datetime", dt);
 
     let mut buf = Vec::new();
@@ -247,10 +247,10 @@ async fn encode_record_with_all_types() {
         .insert("freq", Decimal::from_str("14.074").unwrap())
         .unwrap();
     record
-        .insert("qso_date", NaiveDate::from_ymd_opt(2024, 1, 15).unwrap())
+        .insert("qso_date", Date::new(2024, 1, 15).unwrap())
         .unwrap();
     record
-        .insert("time_on", NaiveTime::from_hms_opt(14, 30, 0).unwrap())
+        .insert("time_on", Time::new(14, 30, 0, 0).unwrap())
         .unwrap();
 
     let mut buf = Vec::new();
@@ -267,10 +267,10 @@ async fn encode_record_with_all_types() {
 
 #[tokio::test]
 async fn encode_datetime_record_fails() {
-    let dt = NaiveDate::from_ymd_opt(2024, 1, 15)
-        .unwrap()
-        .and_hms_opt(14, 30, 45)
-        .unwrap();
+    let dt = DateTime::from_parts(
+        Date::new(2024, 1, 15).unwrap(),
+        Time::new(14, 30, 45, 0).unwrap(),
+    );
     let mut record = Record::new();
     record.insert("call", "W1AW").unwrap();
     record.insert("qso_datetime", dt).unwrap();

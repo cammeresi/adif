@@ -1,6 +1,6 @@
 use std::io;
 
-use chrono::{NaiveDate, NaiveTime};
+use jiff::civil::{Date, DateTime, Time};
 use rust_decimal::Decimal;
 
 use super::*;
@@ -68,13 +68,13 @@ fn tag_is_eor_false_for_field() {
 
 #[test]
 fn as_bool_unsupported_types() {
-    let d = Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
+    let d = Datum::Date(Date::new(2024, 1, 1).unwrap());
     assert!(d.as_bool().is_none());
 
     let n = Datum::Number(Decimal::from(123));
     assert!(n.as_bool().is_none());
 
-    let t = Datum::Time(NaiveTime::from_hms_opt(12, 30, 0).unwrap());
+    let t = Datum::Time(Time::new(12, 30, 0, 0).unwrap());
     assert!(t.as_bool().is_none());
 
     let s = Datum::String("abc".to_string());
@@ -86,10 +86,10 @@ fn as_number_unsupported_types() {
     let b = Datum::Boolean(true);
     assert!(b.as_number().is_none());
 
-    let d = Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
+    let d = Datum::Date(Date::new(2024, 1, 1).unwrap());
     assert!(d.as_number().is_none());
 
-    let t = Datum::Time(NaiveTime::from_hms_opt(12, 30, 0).unwrap());
+    let t = Datum::Time(Time::new(12, 30, 0, 0).unwrap());
     assert!(t.as_number().is_none());
 }
 
@@ -101,13 +101,13 @@ fn as_date_unsupported_types() {
     let n = Datum::Number(Decimal::from(123));
     assert!(n.as_date().is_none());
 
-    let t = Datum::Time(NaiveTime::from_hms_opt(12, 30, 0).unwrap());
+    let t = Datum::Time(Time::new(12, 30, 0, 0).unwrap());
     assert!(t.as_date().is_none());
 }
 
 #[test]
 fn as_time_unsupported_types() {
-    let d = Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
+    let d = Datum::Date(Date::new(2024, 1, 1).unwrap());
     assert!(d.as_time().is_none());
 
     let b = Datum::Boolean(true);
@@ -119,10 +119,10 @@ fn as_time_unsupported_types() {
 
 #[test]
 fn as_datetime_unsupported_types() {
-    let t = Datum::Time(NaiveTime::from_hms_opt(14, 30, 0).unwrap());
+    let t = Datum::Time(Time::new(14, 30, 0, 0).unwrap());
     assert!(t.as_datetime().is_none());
 
-    let d = Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
+    let d = Datum::Date(Date::new(2024, 1, 1).unwrap());
     assert!(d.as_datetime().is_none());
 
     let b = Datum::Boolean(false);
@@ -237,17 +237,15 @@ fn to_cabrillo() {
     let n = Datum::Number(Decimal::from(123));
     assert_eq!(n.to_cabrillo(), "123");
 
-    let d = Datum::Date(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap());
+    let d = Datum::Date(Date::new(2024, 1, 15).unwrap());
     assert_eq!(d.to_cabrillo(), "2024-01-15");
 
-    let t = Datum::Time(NaiveTime::from_hms_opt(12, 34, 56).unwrap());
+    let t = Datum::Time(Time::new(12, 34, 56, 0).unwrap());
     assert_eq!(t.to_cabrillo(), "1234");
 
-    let dt = Datum::DateTime(
-        NaiveDate::from_ymd_opt(2024, 1, 15)
-            .unwrap()
-            .and_hms_opt(12, 34, 56)
-            .unwrap(),
-    );
+    let dt = Datum::DateTime(DateTime::from_parts(
+        Date::new(2024, 1, 15).unwrap(),
+        Time::new(12, 34, 56, 0).unwrap(),
+    ));
     assert_eq!(dt.to_cabrillo(), "2024-01-15 1234");
 }

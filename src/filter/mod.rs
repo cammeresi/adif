@@ -1,8 +1,9 @@
 //! Optional ADIF data transformations
 
 use crate::{Datum, Error, Record};
-use chrono::{Days, NaiveDateTime};
 use futures::stream::Stream;
+use jiff::Span;
+use jiff::civil::DateTime;
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -148,7 +149,7 @@ impl<S> MapExt for S where S: Stream {}
 /// components.  Handle date crossing when time_off is earlier than time_on.
 ///
 /// ```
-/// use chrono::{NaiveDate, NaiveTime, Timelike};
+/// use jiff::civil::{Date, Time};
 /// use difa::filter::normalize_times;
 /// use difa::{Datum, Record, RecordStreamExt, TagDecoder};
 /// use futures::StreamExt;
@@ -162,8 +163,8 @@ impl<S> MapExt for S where S: Stream {}
 ///     .get(":time_on")
 ///     .and_then(|d| d.as_datetime())
 ///     .unwrap();
-/// assert_eq!(dt.date(), NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
-/// assert_eq!(dt.time(), NaiveTime::from_hms_opt(23, 0, 0).unwrap());
+/// assert_eq!(dt.date(), Date::new(2024, 1, 1).unwrap());
+/// assert_eq!(dt.time(), Time::new(23, 0, 0, 0).unwrap());
 /// # });
 /// ```
 pub fn normalize_times<S>(
@@ -183,7 +184,7 @@ where
         let (Some(date), Some(time_on)) = (date, time_on) else {
             return Ok(());
         };
-        let dt = NaiveDateTime::new(date, time_on);
+        let dt = DateTime::from_parts(date, time_on);
         record.insert(TIME_ON, dt)?;
 
         let Some(time_off) = time_off else {
@@ -192,11 +193,12 @@ where
         let date = if let Some(date_off) = date_off {
             date_off
         } else if time_off < time_on {
-            date + Days::new(1)
+            date.checked_add(Span::new().days(1))
+                .map_err(|e| Error::Filter(e.to_string().into()))?
         } else {
             date
         };
-        let dt = NaiveDateTime::new(date, time_off);
+        let dt = DateTime::from_parts(date, time_off);
         record.insert(TIME_OFF, dt)
     })
 }
